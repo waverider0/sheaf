@@ -1,0 +1,3 @@
+tmp/
+templates/*_templ.go
+sheaf.db*
