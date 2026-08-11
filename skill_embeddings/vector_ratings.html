@@ -132,24 +132,22 @@ section 1 derived.</p>
 
 <h2>1. Classical Elo Derivation</h2>
 
-<p><strong>Step 1 — Bradley–Terry.</strong> Give each side a positive number measuring playing strength:
-strength_a and strength_b. Model the win probability as a share of the total strength:</p>
+<p>Classical Elo is a reparameterization of the Bradley-Terry Model. Give each side a positive number measuring playing strength: <span class="var">strength_a</span>, <span class="var">strength_b</span>, and model the win probability as a share of the total strength:</p>
 
 <div class="formula">P(a beats b) = strength_a / (strength_a + strength_b)</div>
 
-<p>The shape is right: the value lies in (0, 1), equal strengths give ½, and only the <em>ratio</em> matters —
-doubling both numbers changes nothing.</p>
+<p>P ∈ (0, 1), equal strengths give 1/2, and only the <em>ratio</em> matters — doubling both numbers changes nothing. Since only ratios matter, we can take logarithms. Every positive number is an exponential, so we define:</p>
 
-<p><strong>Step 2 — log-strengths.</strong> Since only ratios matter, take logarithms. Every positive number is
-an exponential, so define rating_a = ln(strength_a) and rating_b = ln(strength_b):</p>
+<div class="formula">rating_a = ln(strength_a)
+rating_b = ln(strength_b)
+</div>
 
-<div class="formula">P(a beats b) = e^rating_a / (e^rating_a + e^rating_b)</div>
+<p>Thus:</p>
 
-<p><strong>Step 3 — the sigmoid.</strong> Multiply top and bottom by 1/e^rating_a:</p>
-
-<div class="formula">P = 1 / (1 + e^(rating_b − rating_a))
+<div class="formula">P = e^rating_a / (e^rating_a + e^rating_b)
+  = 1 / (1 + e^(rating_b − rating_a))
   = 1 / (1 + e^−(rating_a − rating_b))
-  = sigmoid(rating_a − rating_b)  <span class="dim"># sigmoid(x) = 1 / (1 + e^(−x)), the logistic CDF</span></div>
+  = logistic(rating_a − rating_b)</div>
 
 <p>The win probability now depends only on the <em>difference</em> of log-strengths. Equal rating differences mean
 equal win probabilities at every level of play — which is exactly why ratings live on an additive scale.</p>
@@ -176,12 +174,10 @@ equal win probabilities at every level of play — which is exactly why ratings 
   <text x="300" y="290" font-size="12" fill="#333">rating difference →</text>
   <text x="200" y="48" font-size="11" fill="#16a34a">target matchmaking zone</text>
 </svg>
-<figcaption>The logistic function. A rating difference of ±1.386 maps to an 80%/20% expected score — the shaded
-band (roughly ±1.4) is where games are competitive and each game carries the most rating information; it becomes
-the matchmaking target in section 6.</figcaption>
+<figcaption>The sigmoid curve of the logistic function. A rating difference of ±1.386 maps to an 80%/20% expected score — the shaded band (roughly ±1.4) is where games are competitive and each game carries the most rating information; it becomes the matchmaking target in section 6.</figcaption>
 </figure>
 
-<p><strong>Step 4 — expected vs observed.</strong> Score a win as 1 and a loss as 0; then the sigmoid's output
+<p><strong>Expected vs observed.</strong> Score a win as 1 and a loss as 0; then the sigmoid's output
 <em>is</em> the expected score: 1 × P(win) + 0 × P(loss). After the game, move the rating toward the observation,
 in proportion to the prediction error:</p>
 
