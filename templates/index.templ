@@ -1,18 +1,12 @@
 package templates
 
-// resetOnSuccess clears the search box after an htmx submit lands.
-script resetOnSuccess() {
-	if (event.detail.successful) this.reset()
-}
-
-templ IndexPage(searches []Search) {
+templ IndexPage() {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>SHEAF</title>
-			<script src="/static/htmx.min.js" defer></script>
 			<style>
 				body {
 					font-family: system-ui, sans-serif;
@@ -51,34 +45,14 @@ templ IndexPage(searches []Search) {
 				input:focus {
 					box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
 				}
-				ul {
-					list-style: none;
-					padding: 0;
-					margin: 2rem 0 0;
-					width: min(36rem, 90vw);
-				}
-				li {
-					padding: 0.4rem 0;
-					border-bottom: 1px solid #eee;
-				}
-				.when {
-					color: #70757a;
-					font-size: 0.8rem;
-					margin-left: 0.5rem;
-				}
 			</style>
 		</head>
 		<body>
 			<main>
 				<div class="logo">SHEAF</div>
-				<form action="/search" method="post"
-					hx-post="/search" hx-target="#search-results" hx-swap="innerHTML"
-					hx-on::after-request={ resetOnSuccess() }>
+				<form action="/search" method="post">
 					<input type="text" name="q" placeholder="Search SHEAF" autocomplete="off" required/>
 				</form>
-				<div id="search-results">
-					@SearchList(searches)
-				</div>
 			</main>
 		</body>
 	</html>

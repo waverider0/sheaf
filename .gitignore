@@ -1,3 +1,9 @@
-tmp/
-templates/*_templ.go
 sheaf.db*
+
+tmp/
+
+templates/*_templ.go
+
+db/db.go
+db/models.go
+db/queries.sql.go

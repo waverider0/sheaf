@@ -1,94 +1,54 @@
-// sheaf: serves the landing page — a SHEAF logo with a search bar.
-// Submitting a search inserts it into a SQLite database; the page renders
-// the search list server-side from that database.
+// sheaf: a landing page with a search box; searches land in SQLite and the
+// server log.
 package main
 
 import (
+	"database/sql"
+	_ "embed"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	_ "github.com/mattn/go-sqlite3" // cgo SQLite driver
+
+	"sheaf/db"
 	"sheaf/templates"
 )
 
-func searchHistory() []templates.Search {
-	rows, err := db.Query(
-		`SELECT query, created_at_unix_ms FROM searches
-		 ORDER BY created_at_unix_ms DESC, id DESC`,
-	)
-	if err != nil {
-		log.Printf("query searches: %v", err)
-		return nil
-	}
-	defer rows.Close()
-	var queries []templates.Search
-	for rows.Next() {
-		var q string
-		var ts int64
-		if err := rows.Scan(&q, &ts); err != nil {
-			log.Printf("scan search: %v", err)
-			return nil
-		}
-		queries = append(queries, templates.Search{
-			Query: q,
-			When:  time.UnixMilli(ts).Local().Format("2006-01-02 15:04"),
-		})
-	}
-	if err := rows.Err(); err != nil {
-		log.Printf("iterate searches: %v", err)
-		return nil
-	}
-	return queries
-}
+//go:embed db/schema.sql
+var schemaSQL string
 
-func renderIndex(w http.ResponseWriter, r *http.Request) {
-	if err := templates.IndexPage(searchHistory()).Render(r.Context(), w); err != nil {
-		log.Printf("render index: %v", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-	}
-}
-
-func handleSearch(w http.ResponseWriter, r *http.Request) {
-	q := strings.TrimSpace(r.FormValue("q"))
-	if q == "" {
-		http.Error(w, "empty query", http.StatusBadRequest)
-		return
-	}
-	// cap at 200 chars; the DB CHECK is the backstop
-	if r := []rune(q); len(r) > 200 {
-		q = string(r[:200])
-	}
-	if _, err := db.Exec(
-		`INSERT INTO searches (query, created_at_unix_ms) VALUES (?, ?)`,
-		q, time.Now().UnixMilli(),
-	); err != nil {
-		log.Printf("insert search: %v", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	// htmx: return the fresh list for an in-place swap. Plain-form fallback:
-	// redirect so the updated list renders from the database and a refresh
-	// can't re-submit the search.
-	if r.Header.Get("HX-Request") != "" {
-		if err := templates.SearchList(searchHistory()).Render(r.Context(), w); err != nil {
-			log.Printf("render search list: %v", err)
-			http.Error(w, "internal error", http.StatusInternalServerError)
-		}
-		return
-	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
-}
+var queries *db.Queries
 
 func main() {
-	initDB(dbPath())
-	defer db.Close()
+	databasePath := os.Getenv("SHEAF_DB")
+	if databasePath == "" {
+		databasePath = "sheaf.db"
+	}
+
+	dsn := "file:" + databasePath +
+		"?_busy_timeout=5000" +
+		"&_fk=1" +
+		"&_journal_mode=WAL"
+	database, err := sql.Open("sqlite3", dsn)
+	if err != nil {
+		log.Fatalf("open db: %v", err)
+	}
+
+	// SQLite allows one writer; a single connection avoids SQLITE_BUSY.
+	database.SetMaxOpenConns(1)
+
+	if _, err := database.Exec(schemaSQL); err != nil {
+		log.Fatalf("init schema: %v", err)
+	}
+	queries = db.New(database)
+	defer database.Close()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", renderIndex)
 	mux.HandleFunc("POST /search", handleSearch)
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	addr := os.Getenv("ADDR")
 	if addr == "" {
@@ -96,4 +56,36 @@ func main() {
 	}
 	log.Printf("listening on http://localhost%s", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))
+}
+func renderIndex(w http.ResponseWriter, r *http.Request) {
+	if err := templates.IndexPage().Render(r.Context(), w); err != nil {
+		log.Printf("render index: %v", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+}
+
+func handleSearch(w http.ResponseWriter, r *http.Request) {
+	searchQuery := strings.TrimSpace(r.FormValue("q"))
+	if searchQuery == "" {
+		http.Error(w, "empty query", http.StatusBadRequest)
+		return
+	}
+
+	// the DB CHECK is the backstop
+	const searchQueryLimit = 200
+	if runes := []rune(searchQuery); len(runes) > searchQueryLimit {
+		searchQuery = string(runes[:searchQueryLimit])
+	}
+
+	if err := queries.InsertSearch(r.Context(), db.InsertSearchParams{
+		Query:           searchQuery,
+		CreatedAtUnixMs: time.Now().UnixMilli(),
+	}); err != nil {
+		log.Printf("insert search: %v", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("search: %s", searchQuery)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

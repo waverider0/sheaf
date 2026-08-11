@@ -8,12 +8,17 @@ include_ext = ["go"]
 exclude_dir = ["tmp", "static"]
 exclude_regex = ["_test\\.go"]
 
-# Editing a .templ file regenerates the Go code; the rebuild follows
-# naturally when the generated .go files change.
+# Editing a .templ or .sql file regenerates the Go code; the rebuild
+# follows naturally when the generated .go files change.
 [[build.rules]]
 name = "templ"
 include_ext = ["templ"]
 cmd = "go tool templ generate"
+
+[[build.rules]]
+name = "sqlc"
+include_ext = ["sql"]
+cmd = "go tool sqlc generate"
 
 [proxy]
 enabled = true
