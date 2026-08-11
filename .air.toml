@@ -1,15 +1,13 @@
 root = "."
-tmp_dir = "tmp"
+tmp_dir = "build"
 
 [build]
-cmd = "go build -o ./tmp/main ."
-entrypoint = "./tmp/main"
+cmd = "go build -o ./build/sheaf ./sheaf"
+entrypoint = "./build/sheaf"
 include_ext = ["go"]
-exclude_dir = ["tmp", "static"]
+exclude_dir = ["build", "static"]
 exclude_regex = ["_test\\.go"]
 
-# Editing a .templ or .sql file regenerates the Go code; the rebuild
-# follows naturally when the generated .go files change.
 [[build.rules]]
 name = "templ"
 include_ext = ["templ"]

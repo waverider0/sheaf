@@ -1,5 +1,3 @@
-// sheaf: a landing page with a search box; searches land in SQLite and the
-// server log.
 package main
 
 import (
@@ -11,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3" // cgo SQLite driver
+	_ "github.com/mattn/go-sqlite3"
 
-	"sheaf/db"
-	"sheaf/templates"
+	"sheaf/sheaf/db"
+	"sheaf/sheaf/templates"
 )
 
 //go:embed db/schema.sql
@@ -23,16 +21,7 @@ var schemaSQL string
 var queries *db.Queries
 
 func main() {
-	databasePath := os.Getenv("SHEAF_DB")
-	if databasePath == "" {
-		databasePath = "sheaf.db"
-	}
-
-	dsn := "file:" + databasePath +
-		"?_busy_timeout=5000" +
-		"&_fk=1" +
-		"&_journal_mode=WAL"
-	database, err := sql.Open("sqlite3", dsn)
+	database, err := sql.Open("sqlite3", "file:sheaf.db?_busy_timeout=5000&_fk=1&_journal_mode=WAL")
 	if err != nil {
 		log.Fatalf("open db: %v", err)
 	}
@@ -57,6 +46,7 @@ func main() {
 	log.Printf("listening on http://localhost%s", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))
 }
+
 func renderIndex(w http.ResponseWriter, r *http.Request) {
 	if err := templates.IndexPage().Render(r.Context(), w); err != nil {
 		log.Printf("render index: %v", err)

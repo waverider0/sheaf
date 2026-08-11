@@ -1,9 +1,8 @@
 sheaf.db*
 
-tmp/
+build/
 
-templates/*_templ.go
-
-db/db.go
-db/models.go
-db/queries.sql.go
+sheaf/templates/*_templ.go
+sheaf/db/db.go
+sheaf/db/models.go
+sheaf/db/queries.sql.go
