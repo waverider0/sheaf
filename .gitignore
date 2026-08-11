@@ -1,6 +1,7 @@
 sheaf.db*
 
 build/
+old-garbage/
 
 sheaf/templates/*_templ.go
 sheaf/db/db.go

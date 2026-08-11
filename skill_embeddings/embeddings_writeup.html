@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Embeddings — what they are and how to choose one (sheaf)</title>
+<style>
+  :root {
+    --bg: #ffffff; --ink: #1a1a1a; --muted: #666666; --faint: #999999;
+    --line: #e2e2e2; --table-line: #dddddd;
+    --panel: #f6f7f9; --chip: #f2f3f5;
+    --accent: #2563eb;
+    --ok-bg: #f0fdf4; --ok-border: #22c55e;
+    --warn-bg: #fffbeb; --warn-border: #f59e0b;
+    --bad-bg: #fef2f2; --bad-border: #ef4444;
+    --tldr-bg: #eff6ff;
+    --box-bg: #f8fafc; --box-line: #cbd5e1; --who: #64748b; --arrow: #94a3b8;
+  }
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #14161a; --ink: #e2e5ea; --muted: #9aa3ad; --faint: #8b95a1;
+    --line: #2d333b; --table-line: #2d333b;
+    --panel: #1a1f27; --chip: #1e2228;
+    --accent: #6ea8fe;
+    --ok-bg: rgba(34,197,94,0.10); --ok-border: #22c55e;
+    --warn-bg: rgba(245,158,11,0.10); --warn-border: #f59e0b;
+    --bad-bg: rgba(239,68,68,0.10); --bad-border: #f87171;
+    --tldr-bg: rgba(110,168,254,0.10);
+    --box-bg: #1a1f27; --box-line: #2d333b; --who: #8b95a1; --arrow: #6b7280;
+  }
+  html { background: var(--bg); }
+  body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--ink);
+         line-height: 1.65; max-width: 48rem; margin: 0 auto; padding: 2.5rem 1.25rem 5rem;
+         transition: background 0.15s ease, color 0.15s ease; }
+  nav { font-size: 0.9rem; margin-bottom: 2.5rem; color: var(--muted); }
+  nav a { color: var(--accent); text-decoration: none; }
+  nav a:hover { text-decoration: underline; }
+  h1 { font-size: 1.9rem; letter-spacing: 0.02em; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.3rem; margin-top: 2.8rem; border-bottom: 1px solid var(--line); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.05rem; margin-top: 1.8rem; }
+  .subtitle { color: var(--muted); margin-top: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1.2rem 0; font-size: 0.9rem; }
+  th, td { border: 1px solid var(--table-line); padding: 0.45rem 0.7rem; text-align: left; vertical-align: top; }
+  th { background: var(--panel); }
+  .note { background: var(--warn-bg); border-left: 3px solid var(--warn-border); padding: 0.7rem 1rem; margin: 1.2rem 0; }
+  .bad  { background: var(--bad-bg); border-left: 3px solid var(--bad-border); padding: 0.7rem 1rem; margin: 1.2rem 0; }
+  .good { background: var(--ok-bg); border-left: 3px solid var(--ok-border); padding: 0.7rem 1rem; margin: 1.2rem 0; }
+  .tldr { background: var(--tldr-bg); border-left: 3px solid var(--accent); padding: 0.8rem 1.1rem; margin: 1.5rem 0; }
+  figure { margin: 1.8rem 0; text-align: center; }
+  figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.5rem; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--chip);
+         padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
+  pre { font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--panel);
+        padding: 0.8rem 1rem; overflow-x: auto; font-size: 0.85rem; line-height: 1.55; }
+  .flow { display: flex; align-items: stretch; flex-wrap: wrap; gap: 0.4rem; margin: 1.2rem 0; }
+  .flow .box { border: 1px solid var(--box-line); border-radius: 8px; padding: 0.5rem 0.7rem;
+               font-size: 0.85rem; background: var(--box-bg); flex: 1 1 8rem; text-align: center;
+               display: flex; align-items: center; justify-content: center; }
+  .flow .arr { align-self: center; color: var(--arrow); font-size: 1.1rem; }
+  .steps { margin: 1.2rem 0; }
+  .step { border: 1px solid var(--box-line); border-radius: 8px; padding: 0.55rem 0.9rem;
+          font-size: 0.9rem; background: var(--box-bg); margin: 0.35rem 0; }
+  .step .who { color: var(--who); font-size: 0.8rem; }
+  .down { text-align: center; color: var(--arrow); line-height: 1; }
+  .pair { display: flex; gap: 0.6rem; }
+  .pair .step { flex: 1; }
+  footer { margin-top: 4rem; font-size: 0.8rem; color: var(--faint); border-top: 1px solid var(--line); padding-top: 1rem; }
+  a { color: var(--accent); }
+
+  #theme-toggle { position: fixed; top: 1rem; right: 1rem; width: 3rem; height: 1.6rem;
+                  border-radius: 999px; border: 1px solid var(--table-line); background: var(--panel);
+                  cursor: pointer; padding: 0; z-index: 10; }
+  #theme-toggle .knob { position: absolute; top: 0.15rem; left: 0.15rem; width: 1.2rem; height: 1.2rem;
+                        border-radius: 50%; background: var(--accent); transition: transform 0.15s ease; }
+  [data-theme="dark"] #theme-toggle .knob { transform: translateX(1.4rem); }
+
+  [data-theme="dark"] svg [fill="#333"]   { fill: #d1d5db; }
+  [data-theme="dark"] svg [stroke="#333"] { stroke: #d1d5db; }
+  [data-theme="dark"] svg [fill="#555"]   { fill: #9ca3af; }
+  [data-theme="dark"] svg [stroke="#555"] { stroke: #9ca3af; }
+  [data-theme="dark"] svg [fill="#888"]   { fill: #9ca3af; }
+  [data-theme="dark"] svg [stroke="#888"] { stroke: #9ca3af; }
+  [data-theme="dark"] svg [stroke="#ccc"] { stroke: #4b5563; }
+  [data-theme="dark"] svg [fill="#16a34a"]   { fill: #4ade80; }
+  [data-theme="dark"] svg [stroke="#16a34a"] { stroke: #4ade80; }
+  [data-theme="dark"] svg [fill="#ef4444"]   { fill: #f87171; }
+  [data-theme="dark"] svg [stroke="#ef4444"] { stroke: #f87171; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle" aria-label="Toggle dark mode"><span class="knob"></span></button>
+<script>
+  const themeRoot = document.documentElement;
+  let savedTheme = null;
+  try { savedTheme = localStorage.getItem("sheaf-theme"); } catch (storageError) {}
+  themeRoot.dataset.theme = savedTheme ||
+    (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  document.getElementById("theme-toggle").addEventListener("click", () => {
+    const nextTheme = themeRoot.dataset.theme === "dark" ? "light" : "dark";
+    themeRoot.dataset.theme = nextTheme;
+    try { localStorage.setItem("sheaf-theme", nextTheme); } catch (storageError) {}
+  });
+</script>
+
+<nav>
+  skill_embeddings /
+  <a href="vector_ratings.html">← vector_ratings.html</a> ·
+  <strong>embeddings_writeup.html</strong>
+</nav>
+
+<h1>Embedding Models</h1>
+<p class="subtitle">What an embedding actually is, how model size and dimensionality affect quality,
+and how to build search that doesn't return unrelated bullshit. Written for sheaf's use case:
+short English STEM problem statements, thousands (not millions) of rows, Go + SQLite monolith.</p>
+
+<div class="tldr">
+<strong>TL;DR for sheaf.</strong> Qwen3-Embedding-0.6B via Ollama (Apache-2.0, 1024 dims, Matryoshka-truncatable,
+32K context, runs on CPU). Embed <code>title + statement</code> per problem, store float32 blobs +
+model version in SQLite (sqlite-vec), brute-force scan — milliseconds at this scale. Search:
+vector top-30 ∪ FTS5 top-30, merge with RRF, add a cross-encoder reranker when users complain.
+Thresholds: calibrate on your own corpus, there is no universal number. Build a 50-query eval set
+from the <code>searches</code> table before tuning anything.
+</div>
+
+<h2>1. What an embedding actually is</h2>
+
+<p>The naive picture — "the narrowest bottleneck layer at the far right of the network diagram" — is half right,
+and the wrong half is the important one.</p>
+
+<p><strong>Right half:</strong> you do run text through the network and read off one fixed-size vector near the
+output. For encoder models (BERT-family: MiniLM, BGE, E5) the top layer produces one hidden vector per token;
+a <em>pooling</em> step (mean over tokens, or the [CLS] token) collapses them into one vector. For the modern
+decoder-LLM embedders (Qwen3-Embedding, gte-Qwen2) you take the <em>last token's</em> hidden state instead.</p>
+
+<div class="flow">
+  <div class="box">input tokens</div><div class="arr">→</div>
+  <div class="box">transformer blocks × N</div><div class="arr">→</div>
+  <div class="box">final hidden states<br/>(one vector per token)</div><div class="arr">→</div>
+  <div class="box">pooling<br/>(mean / [CLS] / last-token)</div><div class="arr">→</div>
+  <div class="box"><strong>embedding vector</strong></div>
+</div>
+
+<p><strong>Wrong half:</strong> it is usually <em>not</em> a bottleneck — the embedding is the full hidden width
+(768, 1024, 4096), nothing narrows. And the tap location is not what makes it an embedding. What makes it one
+is the <strong>training objective</strong>: contrastive learning (InfoNCE) over hundreds of millions of
+(query, relevant-passage, hard-negative) triples, which sculpts the space so that cosine similarity
+<em>means</em> semantic relevance. Same transformer without that training → useless geometry: raw BERT
+mean-pooled vectors lose to 2014-era GloVe on similarity tasks, which is exactly the result that motivated
+sentence-transformers. <strong>You are buying the training, not the architecture.</strong></p>
+
+<p>Consequences that fall out of "the geometry is trained":</p>
+<ul>
+  <li>Vectors from two different models are <em>never</em> comparable — different spaces, different planets.
+      Never mix models (or versions, or truncations) inside one index.</li>
+  <li>Models trained for <em>asymmetric retrieval</em> (short query → long document) expect you to mark which is
+      which — prefixes or instructions (§4). Using one side's format for the other costs real accuracy.</li>
+  <li>Vector arithmetic (<code>embed(a) − embed(b)</code>) is not principled in these spaces. Contrastive
+      embeddings are not word2vec; directions don't decompose into concepts you can subtract.</li>
+</ul>
+
+<h2>2. Model size: diminishing returns, sharp edges</h2>
+
+<p>Bigger helps on average, less than you'd think, and mostly in specific regimes. Current landscape
+(MTEB-eng-v2 where available; see <a href="#sources">sources</a>):</p>
+
+<table>
+  <tr><th>Model</th><th>Params</th><th>Dims</th><th>Context</th><th>MTEB</th><th>RAM</th><th>License</th></tr>
+  <tr><td>all-MiniLM-L6-v2</td><td>22M</td><td>384</td><td>256 tok</td><td>56.3 (old board)</td><td>0.1 GB</td><td>Apache-2.0</td></tr>
+  <tr><td>nomic-embed-text-v1.5</td><td>137M</td><td>768 (MRL ↓64)</td><td>8K</td><td>62.3 (old board)</td><td>0.3 GB</td><td>Apache-2.0</td></tr>
+  <tr><td>bge-m3</td><td>568M</td><td>1024</td><td>8K</td><td>~59.6 (multilingual)</td><td>1.2 GB</td><td>MIT</td></tr>
+  <tr><td><strong>Qwen3-Embedding-0.6B</strong></td><td>0.6B</td><td>1024 (MRL ↓32)</td><td>32K</td><td><strong>70.7</strong></td><td>1.5 GB</td><td>Apache-2.0</td></tr>
+  <tr><td>Qwen3-Embedding-4B</td><td>4B</td><td>2560 (MRL)</td><td>32K</td><td>74.6</td><td>9 GB</td><td>Apache-2.0</td></tr>
+  <tr><td>Qwen3-Embedding-8B</td><td>8B</td><td>4096 (MRL)</td><td>32K</td><td><strong>75.2</strong></td><td>17 GB</td><td>Apache-2.0</td></tr>
+</table>
+
+<p>Within the Qwen3 family, 0.6B → 8B is 13× the compute for ~4.5 points. Where size genuinely pays, per an
+independent 2026 benchmark (10 models, tasks MTEB doesn't cover):</p>
+
+<ul>
+  <li><strong>Long documents.</strong> Sub-335M models collapse past ~4K characters: 0.4–0.6 accuracy on
+      needle-in-a-haystack at 8K chars, where ≥2B models score ~1.0. <em>Sheaf verdict: irrelevant — problem
+      statements are short.</em></li>
+  <li><strong>Cross-lingual.</strong> English-only small models score 0.12–0.15 R@1 on Chinese↔English retrieval
+      (functionally zero). <em>Sheaf verdict: irrelevant unless you go multilingual; then look at bge-m3.</em></li>
+  <li><strong>Hard negatives / instruction following.</strong> Bigger models distinguish "kinetics, NOT energy
+      methods" better. Mildly relevant for sheaf queries with exclusions — but handle exclusions with SQL filters
+      and reranking anyway (§4).</li>
+</ul>
+
+<div class="bad"><strong>Three leaderboard traps.</strong> (1) MTEB scores are only comparable <em>within the same
+board version</em> — v2 numbers and the old 56-task numbers are different scales. (2) Several toppers are
+non-commercial licensed: NV-Embed-v2 and jina-embeddings-v3 are CC-BY-NC — fine for experiments, not for a product.
+(3) MTEB rank ≠ rank on <em>your</em> corpus; LaTeX-flavored STEM text is a niche. The only leaderboard that
+matters is the eval set you build yourself (§4).</div>
+
+<h2>3. Dimensionality</h2>
+
+<p>Dimension count is <em>capacity</em>, not quality. A 1024-dim Qwen3-0.6B beats old 1536-dim models; a 384-dim
+MiniLM loses to 1024-dim BGE not because 384 &lt; 1024 but because the model is weaker. What dims actually cost:</p>
+
+<ul>
+  <li><strong>Storage/compute:</strong> 4 bytes × dims per float32 vector. 1024 dims × 100k problems = 400 MB.
+      Dot products scale linearly. Irrelevant at sheaf scale; matters past ~millions of vectors.</li>
+  <li><strong>Effective dimensionality is low.</strong> Embedding clouds are low-rank. Measured on the demo corpus:
+      6 of 384 principal components carried 90% of the variance (toy scale, but the effect is well documented).
+      Nominal dims ≫ information dims.</li>
+</ul>
+
+<h3>MRL: pick the dimension after embedding</h3>
+
+<p>Models trained with <strong>Matryoshka Representation Learning</strong> (Qwen3-Embedding, nomic-embed-text-v1.5,
+jina-v3, OpenAI text-embedding-3-*) have the property that the <em>first N coordinates</em> of the vector form a
+valid smaller embedding. Independent measurement: truncating to 256 dims costs <strong>&lt;1%</strong> Spearman
+correlation for MRL-trained models. So the workflow is: embed once at native size → truncate → renormalize → store.
+(Without MRL training it still "sort of" works on easy corpora — MiniLM 384→64 preserved top-3 ranking in the
+demo — but don't rely on it.)</p>
+
+<div class="note"><strong>For sheaf specifically, d has a second job:</strong> it's also the dimension of the
+<em>skill space</em> in the rating system, where smaller is better (convergence, per-axis statistics). Plan:
+1024-dim vectors for search, a 256-dim MRL-truncated + mean-centered projection for skill. See
+<a href="vector_ratings.html">vector_ratings.html</a> §7.</div>
+
+<h2>4. Search quality: the model is 40% of it</h2>
+
+<p>The rest is pipeline. All findings below are from live runs on this machine
+(all-MiniLM-L6-v2, CPU; scripts and outputs in §7).</p>
+
+<h3>Finding 1: ranking works; absolute scores don't</h3>
+
+<pre>query "related rates ladder sliding down a wall"  →  correct problem 0.719, next best 0.264
+query "how to diagonalize a symmetric matrix"     →  correct problem 0.584, next best 0.134</pre>
+
+<p>Embedding search is a <em>ranking</em> device. The margins on relevant results are wide. But the absolute
+numbers mean nothing in isolation:</p>
+
+<h3>Finding 2: the noise floor rises with corpus size</h3>
+
+<pre>nonsense query "best recipe for chocolate chip cookies", max cosine over corpus:
+corpus    8 docs: +0.057
+corpus   32 docs: +0.290   ← top hit: "A recipe for heat with energy: timing, temperature…"
+corpus  104 docs: +0.290</pre>
+
+<figure>
+<svg viewBox="0 0 460 240" width="460" style="max-width:100%">
+  <line x1="50" y1="200" x2="440" y2="200" stroke="#333"/>
+  <line x1="50" y1="200" x2="50" y2="20" stroke="#ccc"/>
+  <line x1="50" y1="70.4" x2="440" y2="70.4" stroke="#16a34a" stroke-dasharray="6 4"/>
+  <text x="180" y="62" font-size="11" fill="#16a34a">typical good-query top score (~0.72)</text>
+  <rect x="80"  y="189.7" width="60" height="10.3" fill="#ef4444"/>
+  <rect x="200" y="147.8" width="60" height="52.2" fill="#ef4444"/>
+  <rect x="320" y="147.8" width="60" height="52.2" fill="#ef4444"/>
+  <text x="92"  y="184" font-size="11" fill="#333">0.057</text>
+  <text x="216" y="142" font-size="11" fill="#333">0.29</text>
+  <text x="336" y="142" font-size="11" fill="#333">0.29</text>
+  <text x="95"  y="216" font-size="11" fill="#555">8 docs</text>
+  <text x="212" y="216" font-size="11" fill="#555">32 docs</text>
+  <text x="328" y="216" font-size="11" fill="#555">104 docs</text>
+  <text x="10" y="204" font-size="10" fill="#888">0</text>
+  <text x="10" y="114" font-size="10" fill="#888">0.5</text>
+  <line x1="45" y1="110" x2="50" y2="110" stroke="#888"/>
+</svg>
+<figcaption>The unrelated-bullshit effect: <em>something</em> is always nearest. As the corpus grows, the
+best-scoring garbage gets better-scoring. At 10k+ problems and vaguer queries, the garbage band overlaps the
+real-results band.</figcaption>
+</figure>
+
+<div class="bad"><strong>There is no universal similarity threshold.</strong> "0.5 means relevant" is folklore;
+scores are uncalibrated and depend on the model, the corpus, and the query. Any threshold must be measured on
+<em>your</em> data (below).</div>
+
+<h3>The production stack, in order of payoff</h3>
+
+<div class="steps">
+  <div class="step"><span class="who">QUERY SIDE</span><br/>Embed the query with the model's query format
+    (prefix / instruction — below)</div>
+  <div class="down">↓</div>
+  <div class="pair">
+    <div class="step"><span class="who">LEXICAL</span><br/>SQLite FTS5 (BM25) top 20–50<br/>catches exact tokens: symbols, IDs, names</div>
+    <div class="step"><span class="who">SEMANTIC</span><br/>vector scan top 20–50 by cosine<br/>catches paraphrase &amp; topic</div>
+  </div>
+  <div class="down">↓</div>
+  <div class="step"><span class="who">FUSE</span><br/>merge rankings with RRF (reciprocal rank fusion, ~5 lines of code)</div>
+  <div class="down">↓</div>
+  <div class="step"><span class="who">RERANK</span><br/>cross-encoder scores query × each candidate jointly (Qwen3-Reranker-0.6B /
+    bge-reranker-v2) — the single biggest precision fix</div>
+  <div class="down">↓</div>
+  <div class="step"><span class="who">FILTER</span><br/>calibrated threshold or top-1 margin gap → results</div>
+</div>
+
+<ol>
+  <li><strong>Use the model's query/document asymmetry.</strong> E5 wants <code>"query: "</code> /
+      <code>"passage: "</code> prefixes; BGE wants an instruction sentence prepended to queries; Qwen3-Embedding
+      accepts a free-text instruction like <code>"Find a STEM practice problem about: …"</code>. Skipping this
+      costs measurable points. It also replaces attempt-3's query-rewrite hack: instruction-tuned embedders give
+      you "emphasize X" behavior natively. Hard exclusions ("NOT differential equations") belong in SQL
+      <code>WHERE</code> clauses or the reranker prompt, never in vector arithmetic.</li>
+  <li><strong>Hybrid with keyword search.</strong> Embeddings systematically miss exact tokens. You're on SQLite:
+      FTS5 is built in. Merge with RRF.</li>
+  <li><strong>Rerank.</strong> Bi-encoders score query and document <em>separately</em> (fast, fuzzy);
+      cross-encoders see them <em>together</em> and are dramatically better at precision. Cheap: only 20–50
+      candidates cross the reranker. This is the standard answer to "unrelated bullshit in the top-k".</li>
+  <li><strong>Threshold by calibration, not folklore.</strong> Embed your real problems, run real queries, look at
+      the score distributions for results you judge good vs bad, pick a cutoff. Or sidestep absolute scores:
+      require top-1 to clear the field by a margin.</li>
+  <li><strong>Build the eval harness first.</strong> 30–100 (query → known-relevant problem) pairs, measure
+      recall@5 / MRR, rerun after every model/dim/pipeline change. Without it, every choice in §§2–3 is vibes.
+      Sheaf already logs every query to the <code>searches</code> table — that table <em>is</em> the future eval
+      set, and later a source of implicit relevance labels (which problem did the user actually play).</li>
+</ol>
+
+<h2>5. Geometry quirks that matter for sheaf</h2>
+
+<p>Covered fully in <a href="vector_ratings.html">vector_ratings.html</a> §6 — the short version, since it's an
+embedding fact, not a rating fact:</p>
+
+<ul>
+  <li><strong>Anisotropy:</strong> embedding clouds occupy a cone, not the sphere. Measured on 8 deliberately
+      diverse STEM problems: mean pairwise cosine <strong>+0.094</strong> (uniformity predicts 0); same-domain
+      corpora run 0.3–0.6. Any math that assumes zero-mean random directions (like the rating system's tolerance
+      formula) is miscalibrated until you <strong>mean-center the corpus</strong> (subtract the mean embedding μ,
+      renormalize; measured effect: +0.094 → −0.143).</li>
+  <li><strong>Truncation interacts with search and skill differently</strong> — search tolerates high d, skill
+      wants low d. Two projections of one frozen model is fine; two models is not.</li>
+</ul>
+
+<h2>6. Operations on the Go + SQLite monolith</h2>
+
+<ul>
+  <li><strong>Inference:</strong> <code>ollama pull qwen3-embedding:0.6b</code>, call its HTTP API from Go.
+      Boring, swappable, runs on CPU at sheaf's QPS. (Alternative: ONNX runtime in-process via fastembed-style
+      bindings — more setup, same result.)</li>
+  <li><strong>Storage:</strong> float32 blobs via the <code>sqlite-vec</code> extension. Brute-force scan is
+      single-digit milliseconds at thousands of vectors; you don't need an ANN index (HNSW) until ~100k+.
+      Attempt-3 had <em>no</em> vector index on pgvector <em>and</em> serialized vectors as text strings
+      (<code>toSql()</code>) — do neither.</li>
+  <li><strong>Versioning:</strong> store <code>model_name</code>, <code>model_version</code>, dims with every
+      vector. The embedding space freezes at index time; a model swap = re-embed everything. For the skill
+      vectors this is not just ops hygiene — it invalidates ratings (vector_ratings.html §10).</li>
+  <li><strong>Quantization (later):</strong> int8 or binary cuts storage 4–32× with small quality loss. Irrelevant
+      until scale.</li>
+  <li><strong>Free feature:</strong> the same index gives duplicate detection for user-authored problems —
+      cosine &gt; ~0.95 flags a likely dupe before insert.</li>
+</ul>
+
+<h2>7. Attempt-3 postmortem (what to not repeat)</h2>
+
+<table>
+  <tr><th>What attempt-3 did</th><th>Why it hurt</th><th>Do instead</th></tr>
+  <tr><td>gpt-4o rewrites each query into POSITIVE + NEGATIVE variants, embeds both, returns <code>p − n</code>
+      (4 serial paid API calls in the matchmaking hot path)</td>
+      <td>Contrastive embeddings don't support word2vec-style subtraction; p−n breaks unit-norm so every
+      downstream dot-product assumption (strength, tolerance) silently degrades; latency + cost per search</td>
+      <td>Instruction-tuned embedder (free) for emphasis; SQL filters / reranker for exclusions</td></tr>
+  <tr><td>1536 dims because that's what text-embedding-3-small emits</td>
+      <td>Skill space far too wide: sparse skill vectors, slow convergence, broken tolerance math</td>
+      <td>MRL truncation to ~256 for skill; d chosen by you, not the vendor</td></tr>
+  <tr><td>No vector index; vectors stored as text; <code>.where("random", "&gt;=", rand())</code> retry loop for sampling</td>
+      <td>Full-table scans; parse overhead; sampling hack with 5 retries</td>
+      <td>sqlite-vec blob columns (brute force is fine at this scale); <code>ORDER BY RANDOM() LIMIT 1</code></td></tr>
+  <tr><td>Difficulty filter commented out, hardcoded <code>[-10, 10]</code> "for testing"</td>
+      <td>Cold-start bug shipped</td>
+      <td>Exploration phase for new players (vector_ratings.html §8)</td></tr>
+  <tr><td>Seed script inserts <em>random</em> unit vectors as problem embeddings</td>
+      <td>Made the entire matchmaking pipeline unverifiable end-to-end</td>
+      <td>Embed real problem text from day one, even 20 problems</td></tr>
+  <tr><td>OpenAI key committed to git (attempts 1–2)</td>
+      <td>Key burned; rotate if never revoked</td>
+      <td>Env vars only; <code>.env</code> in <code>.gitignore</code></td></tr>
+</table>
+
+<h2 id="sources">8. Sources &amp; demo artifacts</h2>
+
+<ul>
+  <li><a href="https://huggingface.co/spaces/mteb/leaderboard">MTEB leaderboard</a> (Hugging Face) and the
+      <a href="https://leaderboard.mteb.org/models">model table</a> (params, dims, context per model).</li>
+  <li><a href="https://d-central.tech/local-embedding-models/">Best Local Embedding Models for RAG (2026)</a> —
+      the model/dims/context/license/VRAM table used in §2, with per-model benchmark naming.</li>
+  <li><a href="https://zc277584121.github.io/rag/2026/03/20/embedding-models-benchmark-2026.html">Which Embedding
+      Model Should You Actually Use in 2026?</a> — independent benchmark: long-doc degradation of small models,
+      cross-lingual collapse of English-only models, MRL truncation losses &lt;1%.</li>
+  <li><a href="https://huggingface.co/Qwen/Qwen3-Embedding-0.6B">Qwen3-Embedding-0.6B model card</a>.</li>
+</ul>
+
+<p>Live demos (run on this machine, 2026-08-11, all-MiniLM-L6-v2 on CPU):</p>
+<ul>
+  <li><code>/tmp/emb_demo.py</code> — ranking margins, anisotropy + mean-centering, PCA effective
+      dimensionality, 384→64 truncation.</li>
+  <li><code>/tmp/emb_demo2.py</code> — noise floor vs corpus size (§4 chart).</li>
+  <li>Venv used: <code>/tmp/embvenv</code> (~1 GB; delete freely). Rerun with
+      <code>/tmp/embvenv/bin/python /tmp/emb_demo.py</code>.</li>
+</ul>
+
+<footer>
+sheaf · embeddings_writeup.html · companion to <a href="vector_ratings.html">vector_ratings.html</a> ·
+model landscape as of Aug 2026 — recheck MTEB before any final commitment.
+</footer>
+
+</body>
+</html>
