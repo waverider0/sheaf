@@ -202,8 +202,9 @@ MiniLM loses to 1024-dim BGE not because 384 &lt; 1024 but because the model is 
 <ul>
   <li><strong>Storage/compute:</strong> 4 bytes × dims per float32 vector. 1024 dims × 100k problems = 400 MB.
       Dot products scale linearly. Irrelevant at sheaf scale; matters past ~millions of vectors.</li>
-  <li><strong>Effective dimensionality is low.</strong> Embedding clouds are low-rank. Measured on the demo corpus:
-      6 of 384 principal components carried 90% of the variance (toy scale, but the effect is well documented).
+  <li><strong>Effective dimensionality is low.</strong> Embedding clouds are low-rank. Measured on the demo
+      corpus (<a href="embedding_geometry.ipynb">embedding_geometry.ipynb</a> §3): 6 of 384 principal
+      components carried 90% of the variance (toy scale, but the effect is well documented).</li>
       Nominal dims ≫ information dims.</li>
 </ul>
 
@@ -217,9 +218,12 @@ correlation for MRL-trained models. So the workflow is: embed once at native siz
 demo — but don't rely on it.)</p>
 
 <div class="note"><strong>For sheaf specifically, d has a second job:</strong> it's also the dimension of the
-<em>skill space</em> in the rating system, where smaller is better (convergence, per-axis statistics). Plan:
-1024-dim vectors for search, a 256-dim MRL-truncated + mean-centered projection for skill. See
-<a href="vector_ratings.html">vector_ratings.html</a> §7.</div>
+<em>skill space</em> in the rating system, where smaller is better. Each game supplies information along one
+direction only, so more dimensions means more games before a skill vector becomes a faithful profile, and noisier
+per-axis statistics — skill spaces want roughly 128–512 dims, not 1536–4096, and the low effective dimensionality
+above means the extra nominal dims were never buying extra skill axes anyway. Plan: 1024-dim vectors for search, a
+256-dim MRL-truncated + mean-centered projection for skill — two views of the same frozen model's output, never
+mixed in one stored column.</div>
 
 <h2>4. Search quality: the model is 40% of it</h2>
 
@@ -311,7 +315,7 @@ scores are uncalibrated and depend on the model, the corpus, and the query. Any 
 
 <h2>5. Geometry quirks that matter for sheaf</h2>
 
-<p>Covered fully in <a href="vector_ratings.html">vector_ratings.html</a> §6 — the short version, since it's an
+<p>Covered fully in <a href="vector_ratings.html">vector_ratings.html</a> §4 — the short version, since it's an
 embedding fact, not a rating fact:</p>
 
 <ul>
@@ -336,7 +340,7 @@ embedding fact, not a rating fact:</p>
       (<code>toSql()</code>) — do neither.</li>
   <li><strong>Versioning:</strong> store <code>model_name</code>, <code>model_version</code>, dims with every
       vector. The embedding space freezes at index time; a model swap = re-embed everything. For the skill
-      vectors this is not just ops hygiene — it invalidates ratings (vector_ratings.html §10).</li>
+      vectors this is not just ops hygiene — it invalidates ratings (vector_ratings.html §7).</li>
   <li><strong>Quantization (later):</strong> int8 or binary cuts storage 4–32× with small quality loss. Irrelevant
       until scale.</li>
   <li><strong>Free feature:</strong> the same index gives duplicate detection for user-authored problems —
@@ -360,7 +364,7 @@ embedding fact, not a rating fact:</p>
       <td>sqlite-vec blob columns (brute force is fine at this scale); <code>ORDER BY RANDOM() LIMIT 1</code></td></tr>
   <tr><td>Difficulty filter commented out, hardcoded <code>[-10, 10]</code> "for testing"</td>
       <td>Cold-start bug shipped</td>
-      <td>Exploration phase for new players (vector_ratings.html §8)</td></tr>
+      <td>Exploration phase for new players (vector_ratings.html §5)</td></tr>
   <tr><td>Seed script inserts <em>random</em> unit vectors as problem embeddings</td>
       <td>Made the entire matchmaking pipeline unverifiable end-to-end</td>
       <td>Embed real problem text from day one, even 20 problems</td></tr>
@@ -382,14 +386,16 @@ embedding fact, not a rating fact:</p>
   <li><a href="https://huggingface.co/Qwen/Qwen3-Embedding-0.6B">Qwen3-Embedding-0.6B model card</a>.</li>
 </ul>
 
-<p>Live demos (run on this machine, 2026-08-11, all-MiniLM-L6-v2 on CPU):</p>
+<p>Live experiments (run on this machine, 2026-08-11, all-MiniLM-L6-v2 on CPU), as notebooks in
+this folder:</p>
 <ul>
-  <li><code>/tmp/emb_demo.py</code> — ranking margins, anisotropy + mean-centering, PCA effective
-      dimensionality, 384→64 truncation.</li>
-  <li><code>/tmp/emb_demo2.py</code> — noise floor vs corpus size (§4 chart).</li>
-  <li>Venv used: <code>/tmp/embvenv</code> (~1 GB; delete freely). Rerun with
-      <code>/tmp/embvenv/bin/python /tmp/emb_demo.py</code>.</li>
+  <li><code>embedding_geometry.ipynb</code> — ranking margins (§4 Finding 1), anisotropy + mean-centering
+      (§5), PCA effective dimensionality (§3), 384→64 truncation (§3).</li>
+  <li><code>noise_floor.ipynb</code> — the noise floor vs corpus size (§4 Finding 2 chart).</li>
 </ul>
+<p>Both are executed — outputs baked in. To rerun: <code>pip install sentence-transformers</code> (CPU torch
+is enough); the model downloads to <code>~/.cache/huggingface</code> on first use. (An earlier throwaway venv
+lived at <code>/tmp/embvenv</code>; it is not needed.)</p>
 
 <footer>
 sheaf · embeddings_writeup.html · companion to <a href="vector_ratings.html">vector_ratings.html</a> ·
