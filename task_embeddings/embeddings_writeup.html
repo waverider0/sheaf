@@ -47,6 +47,9 @@
   .good { background: var(--ok-bg); border-left: 3px solid var(--ok-border); padding: 0.7rem 1rem; margin: 1.2rem 0; }
   .tldr { background: var(--tldr-bg); border-left: 3px solid var(--accent); padding: 0.8rem 1.1rem; margin: 1.5rem 0; }
   figure { margin: 1.8rem 0; text-align: center; }
+  figure svg { display: block; margin: 0 auto; }
+  figure:not(:has(figcaption)) { margin-bottom: 1.2rem; }
+  figure:not(:has(figcaption)) + h3 { margin-top: 1.2rem; }
   figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.5rem; }
   code { font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--chip);
          padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
@@ -104,7 +107,7 @@
 </script>
 
 <nav>
-  skill_embeddings /
+  task_embeddings /
   <a href="vector_ratings.html">← vector_ratings.html</a> ·
   <strong>embeddings_writeup.html</strong>
 </nav>

@@ -47,6 +47,9 @@
   .bad  { background: var(--bad-bg); border-left: 3px solid var(--bad-border); padding: 0.7rem 1rem; margin: 1.2rem 0; }
   .good { background: var(--ok-bg); border-left: 3px solid var(--ok-border); padding: 0.7rem 1rem; margin: 1.2rem 0; }
   figure { margin: 1.8rem 0; text-align: center; }
+  figure svg { display: block; margin: 0 auto; }
+  figure:not(:has(figcaption)) { margin-bottom: 1.2rem; }
+  figure:not(:has(figcaption)) + h3 { margin-top: 1.2rem; }
   figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.5rem; }
   code { font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--chip);
          padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
@@ -100,18 +103,16 @@
 </script>
 
 <nav>
-  skill_embeddings /
+  task_embeddings /
   <strong>vector_ratings.html</strong> ·
   <a href="embeddings_writeup.html">embeddings_writeup.html →</a>
 </nav>
 
 <h1>Vector Ratings</h1>
 <p class="subtitle">A skill-modelling framework for sheaf that generalizes scalar Elo to a high-dimensional space.
-Direction encodes <em>what</em> you are good at; magnitude encodes <em>how</em> good you are.</p>
+Direction encodes <em>what</em> you are good at; magnitude encodes <em>how good</em> you are.</p>
 
-<p>Classical Elo gives every player one number and every problem one number. Sheaf wants more: a player can be
-strong at combinatorics and weak at calculus, and a scalar can't say that. So both sides of a game become
-geometric objects:</p>
+<p>Classical Elo gives every player and every problem one number; this does not generalize well to tasks of varying type: a player can be strong at combinatorics and weak at calculus, and a single scalar cannot express this. So both sides of a game become geometric objects:</p>
 
 <ul>
   <li>A <strong>player</strong> is a vector — the <span class="var">skill_vector</span>. Its direction is the player's
@@ -126,17 +127,13 @@ geometric objects:</p>
 problems point in similar directions, which is exactly what gives the system its power: playing one problem teaches
 the system something about your strength on <em>nearby</em> problems, for free.</p>
 
-<p>The model is built up from scratch below: section 1 derives classical Elo from first principles, section 2
-lifts it into vectors — where, at <span class="var">dimension_count</span> = 1, it collapses back to exactly what
-section 1 derived.</p>
+<h2>1. Classical Elo derivation</h2>
 
-<h2>1. Classical Elo Derivation</h2>
-
-<p>Classical Elo is a reparameterization of the Bradley-Terry Model. Give each side a positive number measuring playing strength: <span class="var">strength_a</span>, <span class="var">strength_b</span>, and model the win probability as a share of the total strength:</p>
+<p>Classical Elo is a reparameterization of the Bradley-Terry Model, so we start with that. Give each side a positive number measuring playing strength: <span class="var">strength_a</span>, <span class="var">strength_b</span>, and model the win probability as a share of the total strength:</p>
 
 <div class="formula">P(a beats b) = strength_a / (strength_a + strength_b)</div>
 
-<p>P ∈ (0, 1), equal strengths give 1/2, and only the <em>ratio</em> matters — doubling both numbers changes nothing. Since only ratios matter, we can take logarithms. Every positive number is an exponential, so we define:</p>
+<p>P ∈ (0, 1), equal strengths give 0.5, and only the <em>ratio</em> matters — doubling both numbers changes nothing. Since only ratios matter, we can take logarithms. Every positive number is an exponential, so we define:</p>
 
 <div class="formula">rating_a = ln(strength_a)
 rating_b = ln(strength_b)
@@ -145,9 +142,9 @@ rating_b = ln(strength_b)
 <p>Thus:</p>
 
 <div class="formula">P = e^rating_a / (e^rating_a + e^rating_b)
-  = 1 / (1 + e^(rating_b − rating_a))
-  = 1 / (1 + e^−(rating_a − rating_b))
-  = logistic(rating_a − rating_b)</div>
+  = 1 / (1 + e^(rating_b - rating_a))
+  = 1 / (1 + e^-(rating_a - rating_b))
+  = logistic(rating_a - rating_b)</div>
 
 <p>The win probability now depends only on the <em>difference</em> of log-strengths. Equal rating differences mean
 equal win probabilities at every level of play — which is exactly why ratings live on an additive scale.</p>
@@ -168,48 +165,22 @@ equal win probabilities at every level of play — which is exactly why ratings 
   <text x="335" y="66" font-size="12" fill="#16a34a">expected 80%</text>
   <text x="262" y="266" font-size="12" fill="#333">0</text>
   <text x="455" y="266" font-size="12" fill="#333">+4</text>
-  <text x="52" y="266" font-size="12" fill="#333">−4</text>
+  <text x="52" y="266" font-size="12" fill="#333">-4</text>
   <text x="490" y="144" font-size="12" fill="#333">0.5</text>
   <text x="245" y="20" font-size="12" fill="#333">expected_score</text>
   <text x="300" y="290" font-size="12" fill="#333">rating difference →</text>
   <text x="200" y="48" font-size="11" fill="#16a34a">target matchmaking zone</text>
 </svg>
-<figcaption>The sigmoid curve of the logistic function. A rating difference of ±1.386 maps to an 80%/20% expected score — the shaded band (roughly ±1.4) is where games are competitive and each game carries the most rating information; it becomes the matchmaking target in section 6.</figcaption>
+<figcaption>The sigmoid curve of the logistic function. A rating difference of ±1.386 maps to an 0.8/0.2 expected score — the shaded band is where games are competitive and each game carries the most rating information; it becomes the matchmaking target in section 6.</figcaption>
 </figure>
 
-<p><strong>Expected vs observed.</strong> Score a win as 1 and a loss as 0; then the sigmoid's output
-<em>is</em> the expected score: 1 × P(win) + 0 × P(loss). After the game, move the rating toward the observation,
-in proportion to the prediction error:</p>
+<p>Score a win as 1 and a loss as 0; then the sigmoid's output <em>is</em> the expected score: 1 * P(win) + 0 * P(loss). After the game, move the rating toward the observation, in proportion to the prediction error scaled by <span class="var">learning_rate</span> (Elo's K-factor):</p>
 
-<div class="formula">new_rating = rating + learning_rate × (outcome − expected_score)</div>
-
-<p><span class="var">learning_rate</span> is Elo's K-factor. Win as an underdog — a big positive error — and the
-rating jumps; win as a heavy favorite and it barely moves. That is the whole classical model: scalar ratings, a
-sigmoid of the difference, an error-driven update. The rest of this document keeps this machinery intact and
-changes only what the objects are.</p>
+<div class="formula">new_rating = rating + learning_rate * (outcome - expected_score)</div>
 
 <h2>2. Vector ratings</h2>
 
-<p>A scalar rating implicitly assumes a single axis of ability. The vector model drops that assumption: the
-player's scalar becomes a <span class="var">skill_vector</span>, and the problem's scalar splits into a unit
-<span class="var">task_direction</span> — what the problem is about — and a scalar
-<span class="var">difficulty</span> — how hard it is. Section 1's rating difference becomes the difference between
-the player's projected strength on the task and the problem's difficulty; everything else carries over
-unchanged.</p>
-
-<h3>Definitions</h3>
-
-<table>
-  <tr><th>Name</th><th>Type</th><th>Meaning</th></tr>
-  <tr><td class="var">dimension_count</td><td>positive integer</td><td>Size of the skill space. Every vector below lives in R<sup>dimension_count</sup>.</td></tr>
-  <tr><td class="var">skill_vector</td><td>vector</td><td>One per player. Direction = skill composition, length = strength. Evolves with every finished game.</td></tr>
-  <tr><td class="var">task_direction</td><td>unit vector (length 1)</td><td>One per problem. The problem's embedding, normalized to unit length. Fixed (until the embedding model changes).</td></tr>
-  <tr><td class="var">difficulty</td><td>scalar</td><td>One per problem. Evolves as players attempt the problem.</td></tr>
-  <tr><td class="var">strength</td><td>scalar</td><td>A player's projected ability on one specific task: <code>skill_vector · task_direction</code>.</td></tr>
-  <tr><td class="var">expected_score</td><td>scalar in (0, 1)</td><td>Predicted outcome before the game, from the sigmoid.</td></tr>
-  <tr><td class="var">outcome</td><td>0 or 1</td><td>Observed result: loss or win.</td></tr>
-  <tr><td class="var">learning_rate</td><td>positive scalar</td><td>Step size of each update (Elo's K-factor). 1 is a sensible default.</td></tr>
-</table>
+<p>A scalar rating assumes a single axis of ability; the vector model drops this assumption. Section 1's rating difference becomes the difference between the player's projected strength on the task and the problem's difficulty; everything else carries over unchanged.</p>
 
 <h3>Player vs problem (the sheaf game mode)</h3>
 
@@ -217,20 +188,14 @@ unchanged.</p>
 <span class="var">difficulty</span>:</p>
 
 <div class="formula">strength       = skill_vector · task_direction
-expected_score = sigmoid(strength − difficulty)</div>
+expected_score = sigmoid(strength - difficulty)</div>
 
 <p>The player and the problem both update from the same prediction error:</p>
 
-<div class="formula">Δskill_vector = learning_rate × (outcome − expected_score) × task_direction
-Δdifficulty   = −learning_rate × (outcome − expected_score)</div>
+<div class="formula">Δskill_vector = learning_rate * (outcome - expected_score) * task_direction
+Δdifficulty   = -learning_rate * (outcome - expected_score)</div>
 
-<h3>The geometry of strength and difficulty</h3>
-
-<p>Everything above is one picture. A problem defines an axis in skill space, and
-<span class="var">strength</span> is the projection of <span class="var">skill_vector</span> onto that axis — the
-shadow the player's skill casts on this particular problem. The components orthogonal to the task do nothing here,
-but they are not wasted: they are the player's strength on <em>other</em> tasks, which is where transfer comes
-from.</p>
+<h3>Toy example</h3>
 
 <figure>
 <svg viewBox="0 0 520 280" width="520" style="max-width:100%">
@@ -259,52 +224,30 @@ from.</p>
   <polyline points="178.6,141.1 186.6,135.1 180.6,127.1 172.6,133.1" fill="none" stroke="#999" stroke-width="1"/>
   <text x="200" y="110" font-size="12" fill="#16a34a">task_direction</text>
   <text x="222" y="205" font-size="12" fill="#2563eb">skill_vector</text>
-  <text x="287" y="133" font-size="12" fill="#60a5fa">after one win</text>
+  <text x="287" y="133" font-size="12" fill="#60a5fa">after a win</text>
   <text x="262" y="184" font-size="12" fill="#7c3aed">Δskill_vector</text>
   <text x="105" y="210" font-size="12" fill="#555" transform="rotate(-36.87 105 210)">strength</text>
 </svg>
-<figcaption>The worked example below, drawn in its 2D slice (the third component of task_direction is 0, so it
-contributes nothing). task_direction is drawn at its true length: 1. strength is the projection of skill_vector
-onto the task axis. The win slides skill_vector along the task axis by Δskill_vector = learning_rate × error ×
-task_direction (here 0.54), growing the projection by exactly that amount.</figcaption>
 </figure>
 
-<p>Each game slides <span class="var">skill_vector</span> along the task axis by
-<span class="var">learning_rate</span> × error — no other direction is touched — so the projection grows by exactly
-that amount, while <span class="var">difficulty</span> moves by its negative. A player who only plays one kind of
-problem ends up with a skill vector pointing almost entirely along that kind's direction; a broad player
-accumulates components across many directions.</p>
-
-<p>Both sides of the sigmoid lie on the same axis. <span class="var">strength</span> =
-<span class="var">skill_vector</span> · <span class="var">task_direction</span> =
-‖<span class="var">skill_vector</span>‖ × cos(angle) is a <em>length</em>. A unit vector has norm exactly 1, so the projection introduces
-no scale of its own; <span class="var">difficulty</span> co-evolves on that same scale, moving each game by exactly the
-negative of the skill component's change. If <span class="var">task_direction</span> was not of unit length, each problem would carry its
-own scale factor ‖<span class="var">task_direction</span>‖ — like quoting one distance in meters and another in feet:
-the same kind of quantity, but the numbers are no longer comparable across problems.</p>
-
-<h3>Worked example</h3>
-
-<p>A 3-dimensional toy. Unit task direction, a mid-strength player, a problem slightly too hard for them:</p>
-
-<div class="formula">task_direction = (0.8, 0.6, 0)        <span class="dim"># unit length: 0.8² + 0.6² = 1</span>
-skill_vector   = (1.2, 0.3, 0.2)
+<div class="formula">task_direction = (0.8, 0.6, 0)  <span class="dim"># unit length: 0.8² + 0.6² = 1</span> 
 difficulty     = 1.3
+skill_vector   = (1.2, 0.3, 0.2)
 learning_rate  = 1
 
-strength       = 1.2×0.8 + 0.3×0.6 + 0.2×0 = 1.14
-expected_score = sigmoid(1.14 − 1.3) = sigmoid(−0.16) ≈ 0.460</div>
+strength       = 1.2*0.8 + 0.3*0.6 + 0.2*0 = 1.14
+expected_score = logistic(1.14 - 1.3) ≈ 0.460</div>
 
-<p>The player wins (outcome = 1). The prediction error is 1 − 0.460 = 0.540:</p>
+<p>The player wins (outcome = 1). The prediction error is 1 - 0.460 = 0.540:</p>
 
-<div class="formula">Δskill_vector = 0.540 × (0.8, 0.6, 0) = (0.432, 0.324, 0)
-Δdifficulty   = −0.540
+<div class="formula">Δdifficulty   = -0.540
+Δskill_vector = 0.540 * (0.8, 0.6, 0) = (0.432, 0.324, 0)
 
-skill_vector → (1.632, 0.624, 0.2)
 difficulty   → 0.760
+skill_vector → (1.632, 0.624, 0.2)
 
-<span class="dim"># check: new strength = 1.632×0.8 + 0.624×0.6 = 1.680 = 1.14 + 0.540 ✓
-# check: Δstrength + Δdifficulty = 0.540 − 0.540 = 0 ✓</span></div>
+<span class="dim"># check: new strength = 1.632*0.8 + 0.624*0.6 = 1.680 = 1.14 + 0.540 ✓
+# check: Δstrength + Δdifficulty = 0.540 - 0.540 = 0 ✓</span></div>
 
 <p>The player's skill grew <em>only along this problem's direction</em>, and the problem got easier by exactly
 the amount the player got stronger.</p>
@@ -314,14 +257,14 @@ the amount the player got stronger.</p>
 <p>Unroll the update rule. Starting from zero, after G games on task directions
 task_direction₁ … task_direction<sub>G</sub>:</p>
 
-<div class="formula">skill_vector = Σ over games i:  learning_rate × (outcomeᵢ − expectedᵢ) × task_directionᵢ</div>
+<div class="formula">skill_vector = Σ over games i:  learning_rate * (outcomeᵢ - expectedᵢ) * task_directionᵢ</div>
 
 <p>The skill vector is literally a <strong>weighted sum of the directions of everything the player has
 played</strong>, weighted by how surprising each result was. Three consequences:</p>
 
 <ul>
   <li><strong>Transfer is built in.</strong> strength on a never-played task =
-      Σ learning_rate(outcomeᵢ − expectedᵢ)(task_directionᵢ · new_task_direction). Beating algebra problems raises your
+      Σ learning_rate(outcomeᵢ - expectedᵢ)(task_directionᵢ · new_task_direction). Beating algebra problems raises your
       measured strength on calculus exactly in proportion to how aligned the two embeddings are. This is the
       model's core assumption: <em>skill transfer = embedding similarity</em>. For math this is defensible
       (skill is g-loaded), but know that you are assuming it.</li>
@@ -345,14 +288,14 @@ played</strong>, weighted by how surprising each result was. Three consequences:
 random problem's direction is as likely to point one way as any other. Baked into a matchmaking tolerance, that
 assumption looks like:</p>
 
-<div class="formula">tolerance = 0.8416 × ‖skill_vector‖ / √1536     <span class="dim"># 0.8416 = Φ⁻¹(0.80), the normal quantile</span></div>
+<div class="formula">tolerance = 0.8416 * ‖skill_vector‖ / √1536     <span class="dim"># 0.8416 = Φ⁻¹(0.80), the normal quantile</span></div>
 
 <div class="bad"><strong>The assumption is false.</strong> Real text embeddings are <em>anisotropic</em>: the whole
 cloud occupies a narrow cone, not the sphere. Measured on a handful of deliberately-unrelated STEM problems
 (all-MiniLM-L6-v2, see embeddings_writeup.html §5), the mean pairwise cosine between different problems was
 <strong>+0.094</strong> (<a href="embedding_geometry.ipynb">embedding_geometry.ipynb</a> §2) where uniformity
 predicts 0 — and that was on a corpus designed to be diverse. A real
-all-STEM corpus sits much deeper in the cone (0.3–0.6 typical). Consequences:</div>
+all-STEM corpus sits much deeper in the cone (0.3-0.6 typical). Consequences:</div>
 
 <ul>
   <li>strength = skill_vector · task_direction is <strong>not zero-mean</strong> over tasks — it's shifted positive,
@@ -391,7 +334,7 @@ like, with the corpus mean direction μ marked.</figcaption>
 all problem embeddings, subtract it from every problem's vector, and renormalize to unit length. Then
 "task direction" means "direction away from the average problem" — a much better skill axis ("good at X
 <em>relative to a typical problem</em>") — and the zero mean assumed by the spread formula is approximately
-restored. In the measurement cited above, mean-centering moved the mean pairwise cosine from +0.094 to −0.143.
+restored. In the measurement cited above, mean-centering moved the mean pairwise cosine from +0.094 to -0.143.
 Recompute μ whenever problems are bulk-imported; store it alongside the vectors.</div>
 
 <h2>5. Cold start</h2>
@@ -408,7 +351,7 @@ the widening once the mean/calibration is right — the problem was only ever th
 
 <h3>New problem: difficulty is a guess</h3>
 <p>A problem's difficulty only converges after many attempts (each attempt moves it by at most
-learning_rate × ½). Seed new problems from their embedding neighborhood: initialize difficulty to the
+learning_rate * ½). Seed new problems from their embedding neighborhood: initialize difficulty to the
 difficulty-weighted average of its nearest few existing problems, then let play refine it. This also makes new
 problems immediately matchable instead of invisible.</p>
 
@@ -416,13 +359,13 @@ problems immediately matchable instead of invisible.</p>
 
 <p>The matchmaking flow: the player's search query is embedded into a query direction;
 the player's strength is computed against that direction; problems are fetched near the query direction with
-difficulty inside [strength − tolerance, strength + tolerance], where tolerance targets an 80%/20% win-probability
+difficulty inside [strength - tolerance, strength + tolerance], where tolerance targets an 80%/20% win-probability
 window.</p>
 
 <p>Keep the flow, replace the constant:</p>
 
 <ul>
-  <li>Do <strong>not</strong> compute tolerance as 0.8416 × ‖skill_vector‖ / √dimension_count. That derivation
+  <li>Do <strong>not</strong> compute tolerance as 0.8416 * ‖skill_vector‖ / √dimension_count. That derivation
       assumes isotropic directions (section 4) and a normal strength distribution (unverified).</li>
   <li>Instead, <strong>measure</strong>: over the real corpus, compute the distribution of
       skill_vector · task_direction for the player, and set the band from its empirical quantiles. One extra SQL
