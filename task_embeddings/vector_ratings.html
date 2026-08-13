@@ -46,14 +46,13 @@
   .note { background: var(--warn-bg); border-left: 3px solid var(--warn-border); padding: 0.7rem 1rem; margin: 1.2rem 0; }
   .bad  { background: var(--bad-bg); border-left: 3px solid var(--bad-border); padding: 0.7rem 1rem; margin: 1.2rem 0; }
   .good { background: var(--ok-bg); border-left: 3px solid var(--ok-border); padding: 0.7rem 1rem; margin: 1.2rem 0; }
-  figure { margin: 1.8rem 0; text-align: center; }
+  figure { margin: 1.4rem 0; text-align: center; }
   figure svg { display: block; margin: 0 auto; }
   figure:not(:has(figcaption)) { margin-bottom: 1.2rem; }
   figure:not(:has(figcaption)) + h3 { margin-top: 1.2rem; }
   figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.5rem; }
   code { font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--chip);
          padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
-  .var { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--accent); }
   footer { margin-top: 4rem; font-size: 0.8rem; color: var(--faint); border-top: 1px solid var(--line); padding-top: 1rem; }
 
   #theme-toggle { position: fixed; top: 1rem; right: 1rem; width: 3rem; height: 1.6rem;
@@ -115,18 +114,18 @@ Direction encodes <em>what</em> you are good at, magnitude encodes how <em>good<
 <p>Classical Elo gives every player and every problem one number; this does not generalize well to tasks of varying type: a player can be strong at combinatorics and weak at calculus, and a single scalar cannot express this. So both sides of a game become geometric objects:</p>
 
 <ul>
-  <li>A <strong>player's</strong> strengths are represented by a <span class="var">skill_vector</span>; direction encodes skill composition (what types of problems they are good at), length encodes strength.</li>
-  <li>A <strong>problem</strong> is a unit vector, the <span class="var">task_direction</span>, plus a scalar <span class="var">difficulty</span>. The direction says what the problem is about; the scalar says how hard it is.</li>
+  <li>A <strong>player's</strong> strengths are represented by a <code>skill_vector</code>; direction encodes skill composition (what types of problems they are good at), length encodes strength.</li>
+  <li>A <strong>problem</strong> is a unit vector, the <code>task_direction</code>, plus a scalar <code>difficulty</code>. The direction says what the problem is about; the scalar says how hard it is.</li>
 </ul>
 
-<p>The <span class="var">task_direction</span> comes from a text-embedding model run over the problem statement
+<p>The <code>task_direction</code> comes from a text-embedding model run over the problem statement
 (see <a href="embeddings_writeup.html">embeddings_writeup.html</a> for which model and why). Semantically similar
 problems point in similar directions; playing one problem teaches
 the system something about your strength on <em>nearby</em> problems, for free.</p>
 
 <h2>1. Classical Elo derivation</h2>
 
-<p>Classical Elo is a reparameterization of the Bradley-Terry Model, so we start with that. Give each side a positive number measuring playing strength: <span class="var">strength_a</span>, <span class="var">strength_b</span>, and model the win probability as a share of the total strength:</p>
+<p>Classical Elo is a reparameterization of the Bradley-Terry Model, so we start with that. Give each side a positive number measuring playing strength: <code>strength_a</code>, <code>strength_b</code>, and model the win probability as a share of the total strength:</p>
 
 <div class="formula">P(a beats b) = strength_a / (strength_a + strength_b)</div>
 
@@ -170,28 +169,15 @@ rating_b = ln(strength_b)
 <figcaption>The sigmoid curve of the logistic function. A rating difference of ±1.386 maps to an 0.8/0.2 expected score — the shaded band is where games are competitive and each game carries the most rating information; it becomes the matchmaking target in section 6.</figcaption>
 </figure>
 
-<p>Score a win as 1 and a loss as 0; then the sigmoid's output <em>is</em> the expected score: 1 * P(win) + 0 * P(loss). After the game, move the rating toward the observation, in proportion to the prediction error scaled by <span class="var">learning_rate</span> (Elo's K-factor):</p>
+<p>Score a win as 1 and a loss as 0; then the sigmoid's output is the <code>expected_score = 1 * P(win) + 0 * P(loss)</code>. After the game, move the rating toward the observation, in proportion to the prediction error scaled by <code>learning_rate</code> (Elo's K-factor):</p>
 
-<div class="formula">new_rating = rating + learning_rate * (outcome - expected_score)</div>
+<div class="formula">new_rating = rating + learning_rate * (actual_score - expected_score)</div>
 
 <h2>2. Vector ratings</h2>
 
-<p>A scalar rating assumes a single axis of ability; the vector model drops this assumption. Section 1's rating difference becomes the difference between the player's projected strength on the task and the problem's difficulty; everything else carries over unchanged.</p>
+<p>A scalar rating assumes a single axis of ability; the <code>skill_vector</code> model drops this assumption. Section 1's rating difference becomes the difference between the player's projected <code>strength</code> on the task and the problem's <code>difficulty</code>; everything else carries over unchanged.</p>
 
-<h3>Player vs problem (the sheaf game mode)</h3>
-
-<p>The opponent is the problem itself, whose "skill" is its scalar
-<span class="var">difficulty</span>:</p>
-
-<div class="formula">strength       = skill_vector · task_direction
-expected_score = logistic(strength - difficulty)</div>
-
-<p>The player and the problem both update from the same prediction error:</p>
-
-<div class="formula">Δskill_vector = learning_rate * (outcome - expected_score) * task_direction
-Δdifficulty   = -learning_rate * (outcome - expected_score)</div>
-
-<h3>Toy example</h3>
+<h3>Player vs task</h3>
 
 <figure>
 <svg viewBox="0 0 520 280" width="520" style="max-width:100%">
@@ -227,96 +213,118 @@ expected_score = logistic(strength - difficulty)</div>
 </svg>
 </figure>
 
-<div class="formula">task_direction = (0.8, 0.6, 0)  <span class="dim"># unit length: 0.8² + 0.6² = 1</span> 
-difficulty     = 1.3
-skill_vector   = (1.2, 0.3, 0.2)
-learning_rate  = 1
+<p>The opponent is the task, whose "strength" is its scalar
+<code>difficulty</code>:</p>
 
-strength       = 1.2*0.8 + 0.3*0.6 + 0.2*0 = 1.14
-expected_score = logistic(1.14 - 1.3) ≈ 0.460</div>
+<div class="formula">strength       = skill_vector · task_direction
+expected_score = logistic(strength - difficulty)</div>
 
-<p>The player wins (outcome = 1). The prediction error is 1 - 0.460 = 0.540:</p>
+<p>The player and the task both update from the same prediction error:</p>
 
-<div class="formula">Δdifficulty   = -0.540
-Δskill_vector = 0.540 * (0.8, 0.6, 0) = (0.432, 0.324, 0)
-
-difficulty   → 0.760
-skill_vector → (1.632, 0.624, 0.2)
-
-<span class="dim"># check: new strength = 1.632*0.8 + 0.624*0.6 = 1.680 = 1.14 + 0.540 ✓
-# check: Δstrength + Δdifficulty = 0.540 - 0.540 = 0 ✓</span></div>
-
-<p>The player's skill grew <em>only along this problem's direction</em>, and the problem got easier by exactly
-the amount the player got stronger.</p>
+<div class="formula">Δskill_vector = task_direction * (actual_score - expected_score) * learning_rate
+Δdifficulty   = -(actual_score - expected_score) * learning_rate</div>
 
 <h3>Over multiple games</h3>
 
-<p><span class="var">skill_vector</span> is a weighted sum of the directions of everything the player has played, weighted by how surprising each result was:</p>
+<p><code>skill_vector</code> is a weighted sum of the directions of everything the player has played, weighted by how surprising each result was:</p>
 
-<div class="formula">skill_vector = Σ over games i: learning_rate * (outcomeᵢ - expectedᵢ) * task_directionᵢ</div>
+<div class="formula">skill_vector = Σ over games i: task_directionᵢ * (actual_scoreᵢ - expected_scoreᵢ) * learning_rate</div>
 
-<h2>3. High-dimensional geometry: what the update actually does</h2>
+<h2>3. The geometry of skill transfer</h2>
 
-<p>Everything about cross-task interaction reduces to one linear object. Stack the played <span class="var">task_direction</span>s into a matrix <span class="var">M</span> (<span class="var">dimension_count</span> rows, one column per game) and let <span class="var">C = MᵀM</span> be the cosine matrix between them. The skill vector is the initial vector plus a weighted sum of played directions, and strength on every task is:</p>
+<p>One game at task <code>t</code> changes the skill vector by <code>Δskill_vector</code>. The update rule forces <code>Δskill_vector</code> to be parallel to <code>task_direction</code>, so <code>Δstrength_t = |Δskill_vector|</code>. Shown algebraically:</p>
 
-<div class="formula">skill_vector   = skill_vector₀ + M·w  <span class="dim"># w = per-game updates, lr·(outcome - expected)</span>
-strength(task) = skill_vector · task_direction = (C·w)_task</div>
+<div class="formula">Δstrength_t = Δskill_vector · task_direction_t
+            = task_direction_t · task_direction_t * (actual_score - expected_score) * learning_rate
+            = (actual_score - expected_score) * learning_rate</div>
 
-<p>Training task t changes strength at task u by exactly <code>learning_rate · C_tu</code> — the cosine between the
-two directions. Negative transfer (improving at one task scores as decline at another) happens precisely where the
-cosine matrix has negative entries, with magnitude equal to that cosine. The sign structure of C <em>is</em> the
-model's theory of transfer.</p>
+<p>Now take any other task <code>u</code>. Its strength changes by the dot product with <em>its</em> direction, and the same prediction error factors out:</p>
 
-<h3>Two tasks: common vs difference axis</h3>
+<div class="formula">Δstrength_u = Δskill_vector · task_direction_u
+            = Δstrength_t * task_direction_t · task_direction_u
+            = Δstrength_t * cos θ_tu</div>
 
-<p>For tasks A, B with cos θ = c, decompose their directions into a common axis <code>m ∥ d_A + d_B</code> and a
-difference axis <code>n ∥ d_A - d_B</code> — orthogonal by construction. Alternating wins on A and B give:</p>
+<p>A game transfers <code>cos θ_tu</code> of its strength change to every other task:</p>
 
-<div class="formula">per A,B cycle:  +2·lr·cos(θ/2) along m,  0 along n
-strength at A:  +lr·(1 + c) per cycle,  swinging by lr·|c| game to game</div>
+<ul>
+  <li><strong>θ &lt; 90°</strong> positive: semantically similar problems "teach" each other.</li>
+  <li><strong>θ = 90°</strong> nothing: change along <code>t</code> changes nothing along <code>u</code>.</li>
+  <li><strong>θ &gt; 90°</strong> <em>negative</em>: improving at <code>t</code> scores as decline at <code>u</code>.</li>
+</ul>
+
+<h3>A pathology in low dimensions: oscillation</h3>
+
+<p>Take two tasks A and B with cos θ = c and a player who wins at both. By the transfer law, one win at A adds
+<code>Δstrength_A</code> to strength at A and <code>Δstrength_A·c</code> to strength at B; the next win at B
+mirrors it. With both wins carrying the same prediction error e (the structure does not depend on the exact
+values):</p>
+
+<div class="formula">Δstrength_A (per A,B cycle) = learning_rate·e·1 + learning_rate·e·c = learning_rate·e·(1 + c)
+Δskill_vector (per cycle)     = learning_rate·e·(d_A + d_B) = 2·learning_rate·e·cos(θ/2)·m
+                                <span class="dim"># e = actual_score - expected_score; m = bisector of d_A, d_B;
+                                # ‖d_A + d_B‖² = 2 + 2c = 4cos²(θ/2)</span></div>
+
+<p>So per A,B cycle, <code>Δstrength_A = learning_rate·e·(1 + c)</code> — shared skill is credited at (1 + c)/2 per
+game — and the accumulated skill points along the bisector, its length shrinking to zero as the tasks open past 90°.
+Each single game swings the <em>other</em> task's strength by <code>Δstrength_A·c</code>:</p>
 
 <table>
-  <tr><th>cos θ = c</th><th>credit at A per cycle (1 + c)</th><th>common-axis gain 2cos(θ/2)</th><th>oscillation |c|</th></tr>
-  <tr><td>-1.0 (opposed)</td><td>0</td><td>0</td><td>1.0</td></tr>
-  <tr><td>-0.5</td><td>0.5</td><td>1.0</td><td>0.5</td></tr>
-  <tr><td>0 (orthogonal)</td><td>1.0</td><td>1.41</td><td>0</td></tr>
-  <tr><td>+0.5</td><td>1.5</td><td>1.73</td><td>0.5</td></tr>
-  <tr><td>+0.9</td><td>1.9</td><td>1.95</td><td>0.9</td></tr>
+  <tr><th>cos θ = c</th><th>θ</th><th>credit at A per cycle (1 + c)</th><th>swing at B per game |c|</th></tr>
+  <tr><td>-1.0 (opposed)</td><td>180°</td><td>0</td><td>1.0</td></tr>
+  <tr><td>-0.5</td><td>120°</td><td>0.5</td><td>0.5</td></tr>
+  <tr><td>0 (orthogonal)</td><td>90°</td><td>1.0</td><td>0</td></tr>
+  <tr><td>+0.5</td><td>60°</td><td>1.5</td><td>0.5</td></tr>
+  <tr><td>+0.9</td><td>26°</td><td>1.9</td><td>0.9</td></tr>
 </table>
 
-<p>At exact opposition (c = -1) the model credits nothing: strength at A oscillates by learning_rate every game and
-never grows, no matter how many games are won. The shared skill — the component that would help both A and B — is
-learned at rate (1 + c)/2, zero when the tasks point against each other. The difference axis nets zero only for
-<em>symmetric</em> wins; asymmetric outcomes (win at A, lose at B) accumulate it, which is the model correctly
-recording specialization. The failure is specific: a player who genuinely improves at both sides of an opposed pair
-gets no skill credit at all.</p>
+<p>At exact opposition (c = -1) the model credits nothing: every win hands back exactly what the last one took, and
+strength at A oscillates by <code>Δstrength_A</code> per game without ever growing. This is not a failure of
+specialization —
+if the player wins at A but loses at B, the difference direction accumulates and the model records "better at A than
+B" correctly. The failure is specific to symmetric improvement: a player who genuinely gets better at <em>both
+sides</em> of an opposed pair receives no skill credit at all.</p>
 
-<h3>Random directions: high dimension is the safe regime</h3>
+<h3>The null model: random directions</h3>
 
-<p>If task directions were independent and uniform over the unit sphere, the cosine of a random pair has mean 0 and
-variance 1/dimension_count; typical |cosine| ≈ 0.798/√dimension_count, and
-P(cosine ≤ -c) ≈ Φ(-c·√dimension_count). Anti-alignment decays <em>exponentially</em> with dimension: at 384 dims a
-pair as anti-aligned as -0.2 occurs with probability ~3e-5, and even the single most anti-aligned pair in a
-100k-problem corpus is only ≈ -0.35 by chance. Random directions tend to orthogonality as dimension grows — exactly
-the "change along A changes nothing along B" limit. High dimension destroys spurious anti-alignment; it is not the
-source of the pathology. (And the skill vector is not "sparse": embeddings are dense, so every update moves every
-coordinate.)</p>
+<p>How common is anti-alignment? Start with the null model: task directions independent and uniform over the unit
+sphere. The cosine of a random pair has mean 0 — by symmetry, for every pair at cosine c there is an equally likely
+pair at -c — and variance:</p>
 
-<h3>Mean-centering pins the mean: the -1/(N-1) identity</h3>
+<div class="formula">Var[cos θ] = 1/dimension_count
+              <span class="dim"># a random unit vector has E[u_j²] = 1/dimension_count (squares sum to 1, coordinates symmetric);
+              # independence: E[(d_A·d_B)²] = Σ_j E[d_A,j²]·E[d_B,j²] = dimension_count·(1/dimension_count)²</span></div>
 
-<div class="formula">0 = ‖Σ u_i‖² = N + 2·Σ_{i&lt;j} cos(u_i, u_j)   →   mean pairwise cosine = -1/(N-1)</div>
+<p>So random directions concentrate at orthogonality: typical |cos θ| ≈ 0.8/√dimension_count — 0.04 at 384 dims,
+0.01 at 4096 — and strong anti-alignment is exponentially rare. The tail is Gaussian,
+P(cos θ ≤ -c) ≈ Φ(-c·√dimension_count) <span class="dim"># Φ = standard normal CDF</span>: at 384 dims, a pair as
+anti-aligned as -0.2 occurs with probability ≈ 4e-5, and even the single most anti-aligned pair in a 100k-problem
+corpus is only ≈ -0.35 by chance. Under the null model the pathology essentially cannot happen: high dimension
+destroys spurious anti-alignment. (The old worry that a high-dimensional skill vector is "sparse" had it backwards —
+embeddings are dense, and random geometry is friendly.)</p>
 
-<p>Mean-centered unit vectors satisfy this constraint exactly. The measured -0.143 after centering the 8-problem
-corpus <em>is</em> -1/7 — a finite-sample identity, not evidence that centering creates anti-alignment. At corpus
-scale (N ≈ 100k) the centered mean pairwise cosine is ≈ 0: typical pairs are near-orthogonal, precisely the
-zero-mean assumption the spread formula needs.</p>
+<h3>Centering pins the mean: the -1/(N-1) identity</h3>
 
-<h3>Structured corpora: the pathology is set by domain count, not dimension</h3>
+<p>Real directions are not uniform — they cluster, which §4 measures and fixes — and the fix has an exact structural
+consequence we can derive now. After mean-centering, the task directions are unit vectors summing to zero, so:</p>
 
-<p>Real corpora are not uniform — they cluster by topic, and clustering survives high dimension. After centering, K
-balanced domains have centers forming a regular simplex: cross-domain cosines ≈ -1/(K-1), identical at any
-dimension (measured -0.92, -0.46, -0.31, -0.13 for K = 2, 3, 4, 8 at both 32 and 1024 dims). Two domains become
-near-exact opposites; ten dilute the anti-alignment to -0.1.</p>
+<div class="formula">0 = ‖Σ task_direction_i‖² = Σ‖task_direction_i‖² + 2·Σ_{i&lt;j} cos θ_ij = N + 2·Σ cos θ_ij
+→  mean pairwise cosine = -1/(N-1)</div>
+
+<p>The mean is pinned whatever the corpus. That is the whole story of the measured -0.143 after centering the
+8-problem sample: it <em>is</em> -1/7, a finite-sample identity, not evidence of anti-alignment. At corpus scale
+(N ≈ 100k) the centered mean is ≈ 0 — typical pairs are near-orthogonal, exactly the zero-mean assumption the
+spread formula in §4 needs.</p>
+
+<h3>Clusters: the pathology is domain count, not dimension</h3>
+
+<p>The identity pins the mean; the structure lives in the spread. Corpora cluster by topic, and after centering, K
+balanced domains have centers that are K unit vectors summing to ≈ 0 — the same identity at domain level pins the
+cross-domain cosine:</p>
+
+<div class="formula">mean cross-domain cosine = -1/(K-1)
+K = 2 → -1.0    <span class="dim"># near-exact opposition</span>
+K = 3 → -0.5    K = 8 → -0.14
+<span class="dim"># measured -0.92, -0.46, -0.31, -0.13 for K = 2, 3, 4, 8 — identical at 32 and 1024 dims</span></div>
 
 <div class="bad"><strong>The oscillation pathology is a low-domain-count phenomenon, not a high-dimensional one.</strong>
 A two-domain corpus ("math vs humanities") after mean-centering puts the domains almost exactly opposite. Training
