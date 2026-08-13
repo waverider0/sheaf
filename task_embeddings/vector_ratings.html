@@ -26,7 +26,7 @@
   }
   html { background: var(--bg); }
   body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--ink);
-         line-height: 1.65; max-width: 48rem; margin: 0 auto; padding: 2.5rem 1.25rem 5rem;
+         line-height: 1.65; max-width: 50rem; margin: 0 auto; padding: 2.5rem 1.25rem 5rem;
          transition: background 0.15s ease, color 0.15s ease; }
   nav { font-size: 0.9rem; margin-bottom: 2.5rem; color: var(--muted); }
   nav a { color: var(--accent); text-decoration: none; }
@@ -131,13 +131,15 @@ the system something about your strength on <em>nearby</em> problems.</p>
 
 <p>P ∈ (0, 1), equal strengths give 0.5, and only the <em>ratio</em> matters — doubling both numbers changes nothing. Since only ratios matter, we can take logarithms. Every positive number is an exponential, so we define:</p>
 
-<div class="formula">rating_a = ln(strength_a)
+<div class="formula"
+>rating_a = ln(strength_a)
 rating_b = ln(strength_b)
 </div>
 
 <p>Thus:</p>
 
-<div class="formula">P = e^rating_a / (e^rating_a + e^rating_b)
+<div class="formula"
+>P = e^rating_a / (e^rating_a + e^rating_b)
   = 1 / (1 + e^(rating_b - rating_a))
   = 1 / (1 + e^-(rating_a - rating_b))
   = logistic(rating_a - rating_b)</div>
@@ -169,9 +171,13 @@ rating_b = ln(strength_b)
 <figcaption>The sigmoid curve of the logistic function. A rating difference of ±1.386 maps to an 0.8/0.2 expected score — the shaded band is where games are competitive and each game carries the most rating information; it becomes the matchmaking target in section 6.</figcaption>
 </figure>
 
-<p>Score a win as 1 and a loss as 0; then the sigmoid's output is the <code>expected_score = 1 * P(win) + 0 * P(loss)</code>. After the game, move the rating toward the observation, in proportion to the prediction error scaled by <code>learning_rate</code> (Elo's K-factor):</p>
+<p>Score a win as 1 and a loss as 0; then the sigmoid's output is the expected score:</p>
 
-<div class="formula">new_rating = rating + (actual_score - expected_score) * learning_rate</div>
+<div class="formula">expected_score = 1 * P(win) + 0 * P(loss)</div>
+  
+<p>After the game, move the rating toward the observation, in proportion to the prediction error scaled by <code>learning_rate</code> (Elo's K-factor):</p>
+
+<div class="formula">Δrating = (observed_score - expected_score) * learning_rate</div>
 
 <h2>2. Vector ratings</h2>
 
@@ -211,34 +217,32 @@ rating_b = ln(strength_b)
 </svg>
 </figure>
 
-<p>The opponent is the task, whose "strength" is its scalar
-<code>difficulty</code>:</p>
+<div class="formula"
+>strength       = skill_vector · task_direction
+expected_score = logistic(strength - difficulty)
 
-<div class="formula">strength       = skill_vector · task_direction
-expected_score = logistic(strength - difficulty)</div>
-
-<p>The player and the task both update from the same prediction error:</p>
-
-<div class="formula">Δskill_vector = task_direction * (actual_score - expected_score) * learning_rate
-Δdifficulty   = -(actual_score - expected_score) * learning_rate</div>
-
-<p>Over multiple games, <code>skill_vector</code> is a weighted sum of the directions of everything the player has played, weighted by how surprising each result was:</p>
-
-<div class="formula">skill_vector = Σ over games i: task_directionᵢ * (actual_scoreᵢ - expected_scoreᵢ) * learning_rate</div>
+Δstrength     = (observed_score - expected_score) * learning_rate
+Δskill_vector = task_direction * Δstrength
+Δdifficulty   = -Δstrength
+</div>
 
 <h2>3. The geometry of skill transfer</h2>
 
 <p>One game at task <code>t</code> changes the skill vector by <code>Δskill_vector</code>. The update rule forces <code>Δskill_vector</code> to be parallel to <code>task_direction</code>, so <code>Δstrength_t = |Δskill_vector|</code>. Shown algebraically:</p>
 
-<div class="formula">Δstrength_t = Δskill_vector · task_direction_t
-            = task_direction_t · task_direction_t * (actual_score - expected_score) * learning_rate
-            = (actual_score - expected_score) * learning_rate</div>
+<div class="formula"
+>Δstrength_t = Δskill_vector · task_direction_t
+            = task_direction_t · task_direction_t * (observed_score - expected_score) * learning_rate
+            = (observed_score - expected_score) * learning_rate
+</div>
 
 <p>Now take any other task <code>u</code>. Its strength changes by the dot product with <em>its</em> direction, and the same prediction error factors out:</p>
 
-<div class="formula">Δstrength_u = Δskill_vector · task_direction_u
+<div class="formula"
+>Δstrength_u = Δskill_vector · task_direction_u
             = Δstrength_t * task_direction_t · task_direction_u
-            = Δstrength_t * cos θ_tu</div>
+            = Δstrength_t * cos θ_tu
+</div>
 
 <p>A game transfers <code>cos θ_tu</code> of its strength change to every other task:</p>
 
@@ -257,7 +261,7 @@ values):</p>
 
 <div class="formula">Δstrength_A (per A,B cycle) = learning_rate·e·1 + learning_rate·e·c = learning_rate·e·(1 + c)
 Δskill_vector (per cycle)     = learning_rate·e·(d_A + d_B) = 2·learning_rate·e·cos(θ/2)·m
-                                <span class="dim"># e = actual_score - expected_score; m = bisector of d_A, d_B;
+                                <span class="dim"># e = observed_score - expected_score; m = bisector of d_A, d_B;
                                 # ‖d_A + d_B‖² = 2 + 2c = 4cos²(θ/2)</span></div>
 
 <p>So per A,B cycle, <code>Δstrength_A = learning_rate·e·(1 + c)</code> — shared skill is credited at (1 + c)/2 per
