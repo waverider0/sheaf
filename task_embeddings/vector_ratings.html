@@ -121,7 +121,7 @@ Direction encodes <em>what</em> you are good at, magnitude encodes how <em>good<
 <p>The <code>task_direction</code> comes from a text-embedding model run over the problem statement
 (see <a href="embeddings_writeup.html">embeddings_writeup.html</a> for which model and why). Semantically similar
 problems point in similar directions; playing one problem teaches
-the system something about your strength on <em>nearby</em> problems, for free.</p>
+the system something about your strength on <em>nearby</em> problems.</p>
 
 <h2>1. Classical Elo derivation</h2>
 
@@ -171,13 +171,11 @@ rating_b = ln(strength_b)
 
 <p>Score a win as 1 and a loss as 0; then the sigmoid's output is the <code>expected_score = 1 * P(win) + 0 * P(loss)</code>. After the game, move the rating toward the observation, in proportion to the prediction error scaled by <code>learning_rate</code> (Elo's K-factor):</p>
 
-<div class="formula">new_rating = rating + learning_rate * (actual_score - expected_score)</div>
+<div class="formula">new_rating = rating + (actual_score - expected_score) * learning_rate</div>
 
 <h2>2. Vector ratings</h2>
 
 <p>A scalar rating assumes a single axis of ability; the <code>skill_vector</code> model drops this assumption. Section 1's rating difference becomes the difference between the player's projected <code>strength</code> on the task and the problem's <code>difficulty</code>; everything else carries over unchanged.</p>
-
-<h3>Player vs task</h3>
 
 <figure>
 <svg viewBox="0 0 520 280" width="520" style="max-width:100%">
@@ -224,9 +222,7 @@ expected_score = logistic(strength - difficulty)</div>
 <div class="formula">Δskill_vector = task_direction * (actual_score - expected_score) * learning_rate
 Δdifficulty   = -(actual_score - expected_score) * learning_rate</div>
 
-<h3>Over multiple games</h3>
-
-<p><code>skill_vector</code> is a weighted sum of the directions of everything the player has played, weighted by how surprising each result was:</p>
+<p>Over multiple games, <code>skill_vector</code> is a weighted sum of the directions of everything the player has played, weighted by how surprising each result was:</p>
 
 <div class="formula">skill_vector = Σ over games i: task_directionᵢ * (actual_scoreᵢ - expected_scoreᵢ) * learning_rate</div>
 
