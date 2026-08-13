@@ -110,21 +110,18 @@
 
 <h1>Vector Ratings</h1>
 <p class="subtitle">A skill-modelling framework for sheaf that generalizes scalar Elo to a high-dimensional space.
-Direction encodes <em>what</em> you are good at; magnitude encodes <em>how good</em> you are.</p>
+Direction encodes <em>what</em> you are good at, magnitude encodes how <em>good</em> you are.</p>
 
 <p>Classical Elo gives every player and every problem one number; this does not generalize well to tasks of varying type: a player can be strong at combinatorics and weak at calculus, and a single scalar cannot express this. So both sides of a game become geometric objects:</p>
 
 <ul>
-  <li>A <strong>player</strong> is a vector — the <span class="var">skill_vector</span>. Its direction is the player's
-      skill <em>composition</em> (which kinds of problems they are good at); its length is overall strength.</li>
-  <li>A <strong>problem</strong> is a unit vector — the <span class="var">task_direction</span> — plus a scalar
-      <span class="var">difficulty</span>. The direction says what the problem is <em>about</em>; the scalar says how
-      <em>hard</em> it is.</li>
+  <li>A <strong>player's</strong> strengths are represented by a <span class="var">skill_vector</span>; direction encodes skill composition (what types of problems they are good at), length encodes strength.</li>
+  <li>A <strong>problem</strong> is a unit vector, the <span class="var">task_direction</span>, plus a scalar <span class="var">difficulty</span>. The direction says what the problem is about; the scalar says how hard it is.</li>
 </ul>
 
 <p>The <span class="var">task_direction</span> comes from a text-embedding model run over the problem statement
 (see <a href="embeddings_writeup.html">embeddings_writeup.html</a> for which model and why). Semantically similar
-problems point in similar directions, which is exactly what gives the system its power: playing one problem teaches
+problems point in similar directions; playing one problem teaches
 the system something about your strength on <em>nearby</em> problems, for free.</p>
 
 <h2>1. Classical Elo derivation</h2>
@@ -146,8 +143,7 @@ rating_b = ln(strength_b)
   = 1 / (1 + e^-(rating_a - rating_b))
   = logistic(rating_a - rating_b)</div>
 
-<p>The win probability now depends only on the <em>difference</em> of log-strengths. Equal rating differences mean
-equal win probabilities at every level of play — which is exactly why ratings live on an additive scale.</p>
+<p>The win probability now depends only on the difference of log-strengths. Equal rating differences mean equal win probabilities at every level of play, which is exactly why ratings live on an additive scale.</p>
 
 <figure>
 <svg viewBox="0 0 520 300" width="520" style="max-width:100%">
@@ -188,7 +184,7 @@ equal win probabilities at every level of play — which is exactly why ratings 
 <span class="var">difficulty</span>:</p>
 
 <div class="formula">strength       = skill_vector · task_direction
-expected_score = sigmoid(strength - difficulty)</div>
+expected_score = logistic(strength - difficulty)</div>
 
 <p>The player and the problem both update from the same prediction error:</p>
 
@@ -253,30 +249,94 @@ skill_vector → (1.632, 0.624, 0.2)
 <p>The player's skill grew <em>only along this problem's direction</em>, and the problem got easier by exactly
 the amount the player got stronger.</p>
 
-<h2>3. What the skill vector actually is after G games</h2>
+<h3>Over multiple games</h3>
 
-<p>Unroll the update rule. Starting from zero, after G games on task directions
-task_direction₁ … task_direction<sub>G</sub>:</p>
+<p><span class="var">skill_vector</span> is a weighted sum of the directions of everything the player has played, weighted by how surprising each result was:</p>
 
-<div class="formula">skill_vector = Σ over games i:  learning_rate * (outcomeᵢ - expectedᵢ) * task_directionᵢ</div>
+<div class="formula">skill_vector = Σ over games i: learning_rate * (outcomeᵢ - expectedᵢ) * task_directionᵢ</div>
 
-<p>The skill vector is literally a <strong>weighted sum of the directions of everything the player has
-played</strong>, weighted by how surprising each result was. Three consequences:</p>
+<h2>3. High-dimensional geometry: what the update actually does</h2>
+
+<p>Everything about cross-task interaction reduces to one linear object. Stack the played <span class="var">task_direction</span>s into a matrix <span class="var">M</span> (<span class="var">dimension_count</span> rows, one column per game) and let <span class="var">C = MᵀM</span> be the cosine matrix between them. The skill vector is the initial vector plus a weighted sum of played directions, and strength on every task is:</p>
+
+<div class="formula">skill_vector   = skill_vector₀ + M·w  <span class="dim"># w = per-game updates, lr·(outcome - expected)</span>
+strength(task) = skill_vector · task_direction = (C·w)_task</div>
+
+<p>Training task t changes strength at task u by exactly <code>learning_rate · C_tu</code> — the cosine between the
+two directions. Negative transfer (improving at one task scores as decline at another) happens precisely where the
+cosine matrix has negative entries, with magnitude equal to that cosine. The sign structure of C <em>is</em> the
+model's theory of transfer.</p>
+
+<h3>Two tasks: common vs difference axis</h3>
+
+<p>For tasks A, B with cos θ = c, decompose their directions into a common axis <code>m ∥ d_A + d_B</code> and a
+difference axis <code>n ∥ d_A - d_B</code> — orthogonal by construction. Alternating wins on A and B give:</p>
+
+<div class="formula">per A,B cycle:  +2·lr·cos(θ/2) along m,  0 along n
+strength at A:  +lr·(1 + c) per cycle,  swinging by lr·|c| game to game</div>
+
+<table>
+  <tr><th>cos θ = c</th><th>credit at A per cycle (1 + c)</th><th>common-axis gain 2cos(θ/2)</th><th>oscillation |c|</th></tr>
+  <tr><td>-1.0 (opposed)</td><td>0</td><td>0</td><td>1.0</td></tr>
+  <tr><td>-0.5</td><td>0.5</td><td>1.0</td><td>0.5</td></tr>
+  <tr><td>0 (orthogonal)</td><td>1.0</td><td>1.41</td><td>0</td></tr>
+  <tr><td>+0.5</td><td>1.5</td><td>1.73</td><td>0.5</td></tr>
+  <tr><td>+0.9</td><td>1.9</td><td>1.95</td><td>0.9</td></tr>
+</table>
+
+<p>At exact opposition (c = -1) the model credits nothing: strength at A oscillates by learning_rate every game and
+never grows, no matter how many games are won. The shared skill — the component that would help both A and B — is
+learned at rate (1 + c)/2, zero when the tasks point against each other. The difference axis nets zero only for
+<em>symmetric</em> wins; asymmetric outcomes (win at A, lose at B) accumulate it, which is the model correctly
+recording specialization. The failure is specific: a player who genuinely improves at both sides of an opposed pair
+gets no skill credit at all.</p>
+
+<h3>Random directions: high dimension is the safe regime</h3>
+
+<p>If task directions were independent and uniform over the unit sphere, the cosine of a random pair has mean 0 and
+variance 1/dimension_count; typical |cosine| ≈ 0.798/√dimension_count, and
+P(cosine ≤ -c) ≈ Φ(-c·√dimension_count). Anti-alignment decays <em>exponentially</em> with dimension: at 384 dims a
+pair as anti-aligned as -0.2 occurs with probability ~3e-5, and even the single most anti-aligned pair in a
+100k-problem corpus is only ≈ -0.35 by chance. Random directions tend to orthogonality as dimension grows — exactly
+the "change along A changes nothing along B" limit. High dimension destroys spurious anti-alignment; it is not the
+source of the pathology. (And the skill vector is not "sparse": embeddings are dense, so every update moves every
+coordinate.)</p>
+
+<h3>Mean-centering pins the mean: the -1/(N-1) identity</h3>
+
+<div class="formula">0 = ‖Σ u_i‖² = N + 2·Σ_{i&lt;j} cos(u_i, u_j)   →   mean pairwise cosine = -1/(N-1)</div>
+
+<p>Mean-centered unit vectors satisfy this constraint exactly. The measured -0.143 after centering the 8-problem
+corpus <em>is</em> -1/7 — a finite-sample identity, not evidence that centering creates anti-alignment. At corpus
+scale (N ≈ 100k) the centered mean pairwise cosine is ≈ 0: typical pairs are near-orthogonal, precisely the
+zero-mean assumption the spread formula needs.</p>
+
+<h3>Structured corpora: the pathology is set by domain count, not dimension</h3>
+
+<p>Real corpora are not uniform — they cluster by topic, and clustering survives high dimension. After centering, K
+balanced domains have centers forming a regular simplex: cross-domain cosines ≈ -1/(K-1), identical at any
+dimension (measured -0.92, -0.46, -0.31, -0.13 for K = 2, 3, 4, 8 at both 32 and 1024 dims). Two domains become
+near-exact opposites; ten dilute the anti-alignment to -0.1.</p>
+
+<div class="bad"><strong>The oscillation pathology is a low-domain-count phenomenon, not a high-dimensional one.</strong>
+A two-domain corpus ("math vs humanities") after mean-centering puts the domains almost exactly opposite. Training
+both yields near-zero skill credit; training one is scored as active decline in the other. The knob that controls
+the pathology is the number of effective domains K, not dimension_count.</div>
+
+<h3>Consequences for the rating system</h3>
 
 <ul>
-  <li><strong>Transfer is built in.</strong> strength on a never-played task =
-      Σ learning_rate(outcomeᵢ - expectedᵢ)(task_directionᵢ · new_task_direction). Beating algebra problems raises your
-      measured strength on calculus exactly in proportion to how aligned the two embeddings are. This is the
-      model's core assumption: <em>skill transfer = embedding similarity</em>. For math this is defensible
-      (skill is g-loaded), but know that you are assuming it.</li>
-  <li><strong>The space fills in slowly.</strong> Each game moves the vector along one direction only. With
-      <span class="var">dimension_count</span> in the thousands and a few hundred games per player, the skill
-      vector is a sparse spray in a vast space, and most of its information lives in far fewer effective
-      dimensions. The skill space should therefore be kept small — embeddings_writeup.html §3 covers why a few
-      hundred truncated dimensions beat the model's native width.</li>
-  <li><strong>The zero point is arbitrary</strong> — and the update never re-centers it. If all task directions
-      cluster in one cone (they do — next section), then strength values are all shifted positive, and "zero
-      skill" does not mean "average player". Mean-centering (next section) fixes the origin.</li>
+  <li><strong>Predictions at played tasks stay correct anyway.</strong> Difficulty absorbs the improvement: expected
+      scores still converge to 1 while the skill vector stays at zero. The distortion shows up where the skill
+      vector is actually used — cross-task prediction and player-vs-player ranking.</li>
+  <li><strong>Unplayed tasks never move.</strong> The skill vector lives in the span of the played directions (rank
+      at most one per game, whatever the ambient width), so mastery of unplayed topics is unrepresentable by
+      construction; the orthogonal component stays exactly zero.</li>
+  <li><strong>Centered strengths are zero-sum over the corpus.</strong> Skill is relative, not absolute: "good at X
+      relative to a typical problem" implies below-average strength somewhere else. This is comparative advantage as
+      geometry — a modeling choice, not a fact about the world. It is the right object for matchmaking (which only
+      ever compares), and the wrong object if a strength drop on an unplayed topic is read as "the player got worse
+      at it".</li>
 </ul>
 
 <h2>4. Real embedding geometry: anisotropy and the fix</h2>
@@ -335,8 +395,18 @@ like, with the corpus mean direction μ marked.</figcaption>
 all problem embeddings, subtract it from every problem's vector, and renormalize to unit length. Then
 "task direction" means "direction away from the average problem" — a much better skill axis ("good at X
 <em>relative to a typical problem</em>") — and the zero mean assumed by the spread formula is approximately
-restored. In the measurement cited above, mean-centering moved the mean pairwise cosine from +0.094 to -0.143.
-Recompute μ whenever problems are bulk-imported; store it alongside the vectors.</div>
+restored. In the measurement cited above, mean-centering moved the mean pairwise cosine from +0.094 to -0.143 —
+and -0.143 is exactly -1/(N-1) for the 8-problem sample (§3): centering <em>pins</em> the mean pairwise cosine to
+-1/(N-1), a finite-sample identity, so the drop is the identity doing its job, not evidence that the corpus became
+anti-aligned. At corpus scale that mean is ≈ 0 and typical pairs are near-orthogonal — precisely the zero-mean
+assumption the spread formula needs. Recompute μ whenever problems are bulk-imported; store it alongside the
+vectors.</div>
+
+<p>Note what the fix buys and costs. Centered strengths are zero-sum over the corpus (§3): the skill vector is a
+redistribution operator, and absolute improvement is unrepresentable in it — difficulty carries that instead. For
+matchmaking, which only ever compares players and problems on the same scale, relative skill is the right object;
+don't read a strength drop on an unplayed topic as "the player got worse at it" — that is the geometry speaking,
+not evidence.</p>
 
 <h2>5. Cold start</h2>
 
@@ -401,7 +471,7 @@ the new model's task directions live in a different space, so skill_vector · ta
   <tr><td>Cold start (problem)</td><td>Unknown difficulty, unmatchable problems</td><td>Seed difficulty from embedding neighbors (§5)</td></tr>
   <tr><td>No uncertainty term</td><td>A 5-game player and a 500-game player are treated with equal confidence</td><td>Future: per-player uncertainty scalar (Glicko-style RD), modulate learning_rate by it</td></tr>
   <tr><td>Skill-norm drift</td><td>‖skill_vector‖ grows with games played; bands inflate</td><td>Monitor norm distribution; consider normalizing norms or decaying learning_rate</td></tr>
-  <tr><td>Semantic ≠ skill axes</td><td>Transfer follows embedding similarity whether or not real skill transfers that way</td><td>Validate against realized win rates; accept as modeling assumption (§3)</td></tr>
+  <tr><td>Semantic ≠ skill axes</td><td>Transfer follows embedding similarity whether or not real skill transfers that way</td><td>Validate against realized win rates; accept as modeling assumption (§3, §4)</td></tr>
   <tr><td>Model swap</td><td>All ratings silently invalidated</td><td>Version everything; treat as migration (§7)</td></tr>
   <tr><td>Difficulty identifiability</td><td>Rarely-played problems have garbage difficulty</td><td>Display play-count confidence next to difficulty</td></tr>
 </table>
@@ -414,6 +484,8 @@ the new model's task directions live in a different space, so skill_vector · ta
   <li><strong>Reduces to Elo</strong> at dimension_count = 1. Nothing special-cased.</li>
   <li><strong>Zero-sum conservation</strong> along the task direction — rating inflation is structurally
       contained.</li>
+  <li><strong>Skill is relative, not absolute.</strong> Mean-centered strengths are zero-sum over the corpus;
+      absolute improvement is absorbed by difficulty and unplayed topics are invisible (§3, §4).</li>
   <li><strong>Transfer for free:</strong> no per-topic rating tables to maintain; generalization falls out of
       embedding geometry.</li>
   <li><strong>Difficulty is learned</strong> from the population rather than authored, and problems and players

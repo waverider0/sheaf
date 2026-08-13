@@ -222,9 +222,11 @@ demo — but don't rely on it.)</p>
 
 <div class="note"><strong>For sheaf specifically, d has a second job:</strong> it's also the dimension of the
 <em>skill space</em> in the rating system, where smaller is better. Each game supplies information along one
-direction only, so more dimensions means more games before a skill vector becomes a faithful profile, and noisier
-per-axis statistics — skill spaces want roughly 128–512 dims, not 1536–4096, and the low effective dimensionality
-above means the extra nominal dims were never buying extra skill axes anyway. Plan: 1024-dim vectors for search, a
+direction only (the geometry, incl. why the pathology is set by domain count rather than dimension:
+<a href="vector_ratings.html">vector_ratings.html</a> §3), so more dimensions means more games before a skill
+vector becomes a faithful profile, and noisier per-axis statistics — skill spaces want roughly 128–512 dims, not
+1536–4096, and the low effective dimensionality above means the extra nominal dims were never buying extra skill
+axes anyway. Plan: 1024-dim vectors for search, a
 256-dim MRL-truncated + mean-centered projection for skill — two views of the same frozen model's output, never
 mixed in one stored column.</div>
 
@@ -360,7 +362,7 @@ embedding fact, not a rating fact:</p>
       downstream dot-product assumption (strength, tolerance) silently degrades; latency + cost per search</td>
       <td>Instruction-tuned embedder (free) for emphasis; SQL filters / reranker for exclusions</td></tr>
   <tr><td>1536 dims because that's what text-embedding-3-small emits</td>
-      <td>Skill space far too wide: sparse skill vectors, slow convergence, broken tolerance math</td>
+      <td>Skill space far too wide: underdetermined skill vectors (rank ≤ games, so 1536 coords are never independently pinned down), slow convergence, broken tolerance math</td>
       <td>MRL truncation to ~256 for skill; d chosen by you, not the vendor</td></tr>
   <tr><td>No vector index; vectors stored as text; <code>.where("random", "&gt;=", rand())</code> retry loop for sampling</td>
       <td>Full-table scans; parse overhead; sampling hack with 5 retries</td>
