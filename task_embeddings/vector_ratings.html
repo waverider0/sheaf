@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Vector Ratings — sheaf whitepaper</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
 <style>
   :root {
     --bg: #ffffff; --ink: #1a1a1a; --muted: #666666; --faint: #999999;
@@ -83,6 +84,11 @@
   [data-theme="dark"] svg [stroke="#ef4444"] { stroke: #f87171; }
   [data-theme="dark"] svg [fill="#7c3aed"]   { fill: #a78bfa; }
   [data-theme="dark"] svg [stroke="#7c3aed"] { stroke: #a78bfa; }
+  .katex { color: inherit; }
+  .katex-display { display: block; margin: 1rem 0; padding: 0.7rem 1rem; background: var(--panel); border-left: 3px solid var(--accent); overflow-x: auto; text-align: left; }
+  [data-theme="dark"] #sphereGrad stop:first-child { stop-color: #94a3b8; }
+  [data-theme="dark"] #sphereGrad stop:nth-child(2) { stop-color: #475569; }
+  [data-theme="dark"] #sphereGrad stop:last-child { stop-color: #1e293b; }
 </style>
 </head>
 <body>
@@ -201,19 +207,18 @@ rating_b = ln(strength_b)
   </defs>
   <line x1="60" y1="230" x2="500" y2="230" stroke="#ddd"/>
   <line x1="60" y1="230" x2="60" y2="15" stroke="#ddd"/>
-  <line x1="164" y1="152" x2="278" y2="66" stroke="#16a34a" stroke-width="1" stroke-dasharray="4 4"/>
-  <line x1="60" y1="230" x2="164" y2="152" stroke="#16a34a" stroke-width="2.5" marker-end="url(#mGreen)"/>
+  <line x1="60" y1="230" x2="278" y2="66" stroke="#16a34a" stroke-width="2.5" marker-end="url(#mGreen)"/>
   <line x1="60" y1="230" x2="216" y2="191" stroke="#2563eb" stroke-width="2.5" marker-end="url(#mBlue)"/>
   <line x1="60" y1="230" x2="272" y2="149" stroke="#60a5fa" stroke-width="2.5" marker-end="url(#mLight)"/>
   <line x1="216" y1="191" x2="272" y2="149" stroke="#7c3aed" stroke-width="2" marker-end="url(#mPurple)"/>
   <line x1="216" y1="191" x2="178.6" y2="141.1" stroke="#999" stroke-width="1.5" stroke-dasharray="4 3"/>
   <polyline points="178.6,141.1 184.6,149.1 176.6,155.1 170.6,147.1" fill="none" stroke="#999" stroke-width="1"/>
   <polyline points="216,191 210,183 218,177 224,185" fill="none" stroke="#999" stroke-width="1"/>
-  <text x="200" y="110" font-size="12" fill="#16a34a">task_direction</text>
-  <text x="222" y="205" font-size="12" fill="#2563eb">skill_vector</text>
-  <text x="287" y="133" font-size="12" fill="#60a5fa">after a win</text>
-  <text x="262" y="184" font-size="12" fill="#7c3aed">Δskill_vector</text>
-  <text x="105" y="210" font-size="12" fill="#555" transform="rotate(-36.87 105 210)">strength</text>
+  <text x="160.6" y="140" font-size="12" fill="#16a34a" text-anchor="middle" transform="rotate(-36.87 160.6 136.8)">task_direction scaled by difficulty</text>
+  <text x="185" y="215" font-size="12" fill="#2563eb">skill_vector</text>
+  <text x="265" y="140" font-size="12" fill="#60a5fa">after a win</text>
+  <text x="242" y="185" font-size="12" fill="#7c3aed">Δskill_vector</text>
+  <text x="110" y="211" font-size="12" fill="#555" transform="rotate(-36.87 105 210)">strength</text>
 </svg>
 </figure>
 
@@ -228,15 +233,7 @@ expected_score = logistic(strength - difficulty)
 
 <h2>3. The geometry of skill transfer</h2>
 
-<p>One game at task <code>t</code> changes the skill vector by <code>Δskill_vector</code>. The update rule forces <code>Δskill_vector</code> to be parallel to <code>task_direction</code>, so <code>Δstrength_t = |Δskill_vector|</code>. Shown algebraically:</p>
-
-<div class="formula"
->Δstrength_t = Δskill_vector · task_direction_t
-            = task_direction_t · task_direction_t * (observed_score - expected_score) * learning_rate
-            = (observed_score - expected_score) * learning_rate
-</div>
-
-<p>Now take any other task <code>u</code>. Its strength changes by the dot product with <em>its</em> direction, and the same prediction error factors out:</p>
+<p>After doing task <code>t</code>, the change in projected strength on task <code>u</code> is:</p>
 
 <div class="formula"
 >Δstrength_u = Δskill_vector · task_direction_u
@@ -254,22 +251,33 @@ expected_score = logistic(strength - difficulty)
 
 <h3>A pathology in low dimensions: oscillation</h3>
 
-<p>Take two tasks A and B with cos θ = c and a player who wins at both. By the transfer law, one win at A adds
-<code>Δstrength_A</code> to strength at A and <code>Δstrength_A·c</code> to strength at B; the next win at B
-mirrors it. With both wins carrying the same prediction error e (the structure does not depend on the exact
-values):</p>
+<p>The transfer law miscredits symmetric improvement at anti-aligned tasks: two opposed tasks credit a player who
+wins at both at less than half rate — at exact opposition, not at all. Whether that matters is geometric: under
+uniform random directions anti-alignment is exponentially rare, but real corpora cluster, and after mean-centering
+the risk is set by the number of domains, not the dimension.</p>
 
-<div class="formula">Δstrength_A (per A,B cycle) = learning_rate·e·1 + learning_rate·e·c = learning_rate·e·(1 + c)
-Δskill_vector (per cycle)     = learning_rate·e·(d_A + d_B) = 2·learning_rate·e·cos(θ/2)·m
-                                <span class="dim"># e = observed_score - expected_score; m = bisector of d_A, d_B;
-                                # ‖d_A + d_B‖² = 2 + 2c = 4cos²(θ/2)</span></div>
+<p>Take tasks t and u with <code>cos θ_tu</code> and a player who wins at both. A win at t adds
+<code>Δstrength_t</code> to strength at t and transfers <code>Δstrength_t * cos θ_tu</code> to strength at u; a
+win at u adds <code>Δstrength_u</code> to strength at u and transfers <code>Δstrength_u * cos θ_ut</code> to
+strength at t. One t,u cycle then nets:</p>
 
-<p>So per A,B cycle, <code>Δstrength_A = learning_rate·e·(1 + c)</code> — shared skill is credited at (1 + c)/2 per
-game — and the accumulated skill points along the bisector, its length shrinking to zero as the tasks open past 90°.
-Each single game swings the <em>other</em> task's strength by <code>Δstrength_A·c</code>:</p>
+<div class="formula"
+>Δstrength_t (per cycle)   = Δstrength_t + Δstrength_u * cos θ_ut
+
+Δskill_vector (per cycle) = task_direction_t * Δstrength_t + task_direction_u * Δstrength_u
+</div>
+
+<p>The pathology is symmetric improvement — a player who genuinely gets better at <em>both</em> tasks, so the two
+wins move strength equally. Set <code>Δstrength_t = Δstrength_u</code>; the cycle then nets:</p>
+
+<div class="formula">Δstrength_t (per cycle) = Δstrength_t * (1 + cos θ_tu)</div>
+
+<p>The <code>1</code> is its own win, the <code>cos θ_tu</code> is the transfer from the other. The transfer also
+swings the other task by <code>Δstrength_t * cos θ_tu</code> each game, negative for cos θ_tu &lt; 0 — improving at
+t reads as decline at u:</p>
 
 <table>
-  <tr><th>cos θ = c</th><th>θ</th><th>credit at A per cycle (1 + c)</th><th>swing at B per game |c|</th></tr>
+  <tr><th>cos θ_tu</th><th>θ_tu</th><th>credit at t per cycle (1 + cos θ_tu)</th><th>swing at u per game |cos θ_tu|</th></tr>
   <tr><td>-1.0 (opposed)</td><td>180°</td><td>0</td><td>1.0</td></tr>
   <tr><td>-0.5</td><td>120°</td><td>0.5</td><td>0.5</td></tr>
   <tr><td>0 (orthogonal)</td><td>90°</td><td>1.0</td><td>0</td></tr>
@@ -277,51 +285,103 @@ Each single game swings the <em>other</em> task's strength by <code>Δstrength_A
   <tr><td>+0.9</td><td>26°</td><td>1.9</td><td>0.9</td></tr>
 </table>
 
-<p>At exact opposition (c = -1) the model credits nothing: every win hands back exactly what the last one took, and
-strength at A oscillates by <code>Δstrength_A</code> per game without ever growing. This is not a failure of
-specialization —
-if the player wins at A but loses at B, the difference direction accumulates and the model records "better at A than
-B" correctly. The failure is specific to symmetric improvement: a player who genuinely gets better at <em>both
-sides</em> of an opposed pair receives no skill credit at all.</p>
+<p>At exact opposition (cos θ_tu = -1) symmetric improvement credits nothing: every win hands back exactly what the
+last one took, strength at t oscillates by <code>Δstrength_t</code> per game without growing, and the skill vector
+never moves. This is not a failure of specialization — win at t and lose at u, and the skill vector moves by
+<code>Δstrength_t - Δstrength_u</code> along <code>task_direction_t</code>, so the model records
+"better at t than u" correctly. The failure is specific to symmetric improvement: a player who genuinely gets
+better at <em>both sides</em> of an opposed pair receives no skill credit at all.</p>
 
 <h3>The null model: random directions</h3>
 
-<p>How common is anti-alignment? Start with the null model: task directions independent and uniform over the unit
-sphere. The cosine of a random pair has mean 0 — by symmetry, for every pair at cosine c there is an equally likely
-pair at -c — and variance:</p>
+<p>How common is anti-alignment? Under the null model, task directions are independent and uniform over the unit
+sphere; the cosine of a random pair has mean 0 — by symmetry, every pair at cosine c is matched by one at -c — and
+variance:</p>
 
 <div class="formula">Var[cos θ] = 1/dimension_count
               <span class="dim"># a random unit vector has E[u_j²] = 1/dimension_count (squares sum to 1, coordinates symmetric);
-              # independence: E[(d_A·d_B)²] = Σ_j E[d_A,j²]·E[d_B,j²] = dimension_count·(1/dimension_count)²</span></div>
+              # independence: E[(u · v)²] = Σ_j E[u_j²] * E[v_j²] = dimension_count * (1/dimension_count)²</span></div>
 
-<p>So random directions concentrate at orthogonality: typical |cos θ| ≈ 0.8/√dimension_count — 0.04 at 384 dims,
-0.01 at 4096 — and strong anti-alignment is exponentially rare. The tail is Gaussian,
-P(cos θ ≤ -c) ≈ Φ(-c·√dimension_count) <span class="dim"># Φ = standard normal CDF</span>: at 384 dims, a pair as
-anti-aligned as -0.2 occurs with probability ≈ 4e-5, and even the single most anti-aligned pair in a 100k-problem
-corpus is only ≈ -0.35 by chance. Under the null model the pathology essentially cannot happen: high dimension
-destroys spurious anti-alignment. (The old worry that a high-dimensional skill vector is "sparse" had it backwards —
-embeddings are dense, and random geometry is friendly.)</p>
+<p>So random directions concentrate at orthogonality: √dimension_count * cos θ is approximately standard normal, so
+mean |cos θ| ≈ √(2/π)/√dimension_count ≈ 0.8/√dimension_count — 0.04 at 384 dims — and strong anti-alignment is
+exponentially rare: the tail is Gaussian for small c, P(cos θ ≤ -c) ≈ Φ(-c * √dimension_count) <span class="dim"># Φ = standard normal CDF</span>, and
+for fixed c decays like (1 - c²)^(dimension_count / 2) — the exact rate, derived below. At 384 dims, a pair as anti-aligned as -0.2 occurs with probability ≈ 4e-5.
+Under the null model the pathology essentially cannot happen: high dimension destroys spurious anti-alignment.</p>
+
+<p>Make it concrete. Call a pair pathological when cos θ ≤ -0.5 — the transfer cancels at least half the win, so
+the angle is within 60° of exact opposition. In 2 dimensions that is exactly 1/3 of the circle (the 120° arc from
+120° to 240°); the fraction only shrinks with dimension — 1/4 at 3, ≈ 1/5 at 4, 8% at 8, 2% at 16, and
+≈ 5e-26 at 384. One third is the worst case, and it is a low-dimensional
+pathology under the null model.</p>
+
+<figure>
+<svg viewBox="0 0 560 245" width="560" style="max-width:100%">
+  <circle cx="90" cy="115" r="70" fill="none" stroke="#333" stroke-width="1.5"/>
+  <line x1="12" y1="115" x2="168" y2="115" stroke="#ccc" stroke-width="1"/>
+  <line x1="90" y1="28" x2="90" y2="202" stroke="#ccc" stroke-width="1"/>
+  <line x1="90" y1="115" x2="55" y2="54.38" stroke="#ef4444" stroke-width="1" opacity="0.55"/>
+  <line x1="90" y1="115" x2="55" y2="175.62" stroke="#ef4444" stroke-width="1" opacity="0.55"/>
+  <path d="M 55 54.38 A 70 70 0 0 0 55 175.62" fill="none" stroke="#ef4444" stroke-width="4" stroke-linecap="round"/>
+  <text x="90" y="230" font-size="12" fill="#555" text-anchor="middle">d = 2 — a 120° arc (1/3)</text>
+
+  <circle cx="280" cy="115" r="70" fill="#dde3ea" stroke="#333" stroke-width="1.5"/>
+  <line x1="280" y1="28" x2="280" y2="202" stroke="#ccc" stroke-width="1"/>
+  <line x1="202" y1="115" x2="358" y2="115" stroke="#ccc" stroke-width="1"/>
+  <line x1="280" y1="115" x2="244.3" y2="104" stroke="#ef4444" stroke-width="1" opacity="0.55"/>
+  <line x1="280" y1="115" x2="315.7" y2="104" stroke="#ef4444" stroke-width="1" opacity="0.55"/>
+  <path d="M 338.4 76.4 A 60.62 25.62 0 0 0 221.6 76.4" fill="none" stroke="#999" stroke-width="1" stroke-dasharray="3 3"/>
+  <path d="M 221.6 76.4 A 60.62 25.62 0 1 0 338.4 76.4 A 70 70 0 0 0 221.6 76.4 Z" fill="#ef4444" opacity="0.8" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="280" y="230" font-size="12" fill="#555" text-anchor="middle">d = 3 — a spherical cap (1/4)</text>
+
+  <text x="470" y="124" font-size="28" fill="#333" text-anchor="middle">…</text>
+  <text x="470" y="230" font-size="12" fill="#555" text-anchor="middle">d ≥ 4 — (1-c²)^(d/2)</text>
+</svg>
+<figcaption>The pathological set (cos θ ≤ -0.5): a 120° arc of the circle, a spherical cap of the sphere, and a
+vanishing slice beyond. Directions are unit vectors, so fractions are measured on the boundary — arc over
+circumference, cap area over sphere area. The cone from the center through the set fills the same fraction of the
+disk or ball (the plane-cut cap solid does not). Slicing by u · t = -c leaves a sphere one dimension down — the cap
+is a solid of revolution.</figcaption>
+</figure>
+
+<p>Exactly, and the fraction has a closed form. Fix <code>t = e₁</code> (the +x axis); the pathological set is the
+cap <code>{u : u · t ≤ -c}</code>, and its fraction of the sphere is the regularized incomplete beta function:</p>
+
+$$F_d(c) = \mathrm{I}_{(1-c)/2}\!\left(\tfrac{d-1}{2},\ \tfrac{d-1}{2}\right)$$
+
+<p>which for integer <code>d</code> collapses to elementary forms, split by parity:</p>
+
+$$F_2 = \frac{\arccos c}{\pi},\quad F_3 = \frac{1-c}{2},\quad F_4 = \frac{\arccos c - c\sqrt{1-c^2}}{\pi},\quad F_5 = \frac{2-3c+c^3}{4}$$
+
+<p>odd <code>d</code> is a polynomial in <code>c</code>; even <code>d</code> is <code>arccos c</code> minus a
+polynomial multiple of <code>√(1-c²)</code>. The recursion between dimensions is the surface-of-revolution step:</p>
+
+$$F_d(c) = F_{d-2}(c) - \frac{\Gamma\!\left(\tfrac{d-2}{2}\right)}{2\sqrt{\pi}\,\Gamma\!\left(\tfrac{d-1}{2}\right)}\, c\,(1-c^2)^{(d-3)/2}$$
+
+<p>with <code>F₁ = 1/2</code> and <code>F₂ = arccos c / π</code>. For large <code>d</code> the exact rate is the
+large-deviation tail, not the Gaussian one:</p>
+
+$$F_d(c) \sim \frac{(1-c^2)^{(d-1)/2}}{c\sqrt{2\pi(d-3)}} \sim (1-c^2)^{d/2}$$
 
 <h3>Centering pins the mean: the -1/(N-1) identity</h3>
 
-<p>Real directions are not uniform — they cluster, which §4 measures and fixes — and the fix has an exact structural
-consequence we can derive now. After mean-centering, the task directions are unit vectors summing to zero, so:</p>
+<p>Real directions are not uniform — they cluster by topic, which §4 measures and fixes by mean-centering. Centering
+has an exact structural consequence: the centered task vectors sum to zero, and their lengths stay ≈ 1, so:</p>
 
-<div class="formula">0 = ‖Σ task_direction_i‖² = Σ‖task_direction_i‖² + 2·Σ_{i&lt;j} cos θ_ij = N + 2·Σ cos θ_ij
-→  mean pairwise cosine = -1/(N-1)</div>
+<div class="formula">0 = ‖Σ task_direction_i‖² = Σ‖task_direction_i‖² + 2 * Σ_{i&lt;j} cos θ_ij ≈ N + 2 * Σ cos θ_ij
+→  mean pairwise cosine ≈ -1/(N-1)</div>
 
-<p>The mean is pinned whatever the corpus. That is the whole story of the measured -0.143 after centering the
-8-problem sample: it <em>is</em> -1/7, a finite-sample identity, not evidence of anti-alignment. At corpus scale
-(N ≈ 100k) the centered mean is ≈ 0 — typical pairs are near-orthogonal, exactly the zero-mean assumption the
-spread formula in §4 needs.</p>
+<p>The mean is pinned whatever the corpus. That is the whole story of the -0.143 measured on the 8-problem sample
+after mean-centering (embedding_geometry.ipynb §2; see §4): it <em>is</em> -1/7 — a finite-sample identity, not
+evidence of anti-alignment. At corpus scale (N ≈ 100k) the centered mean is ≈ 0, typical pairs near-orthogonal,
+exactly the zero-mean assumption the spread formula in §4 needs.</p>
 
 <h3>Clusters: the pathology is domain count, not dimension</h3>
 
-<p>The identity pins the mean; the structure lives in the spread. Corpora cluster by topic, and after centering, K
-balanced domains have centers that are K unit vectors summing to ≈ 0 — the same identity at domain level pins the
-cross-domain cosine:</p>
+<p>The identity pins the mean; the structure lives in the spread — and there the pathology returns, at any
+dimension. Corpora cluster by topic; after centering, K balanced domains have centers that behave like K unit
+vectors summing to ≈ 0, and the same identity at domain level pins the cross-domain cosine:</p>
 
-<div class="formula">mean cross-domain cosine = -1/(K-1)
+<div class="formula">mean cross-domain cosine ≈ -1/(K-1)
 K = 2 → -1.0    <span class="dim"># near-exact opposition</span>
 K = 3 → -0.5    K = 8 → -0.14
 <span class="dim"># measured -0.92, -0.46, -0.31, -0.13 for K = 2, 3, 4, 8 — identical at 32 and 1024 dims</span></div>
@@ -334,17 +394,17 @@ the pathology is the number of effective domains K, not dimension_count.</div>
 <h3>Consequences for the rating system</h3>
 
 <ul>
-  <li><strong>Predictions at played tasks stay correct anyway.</strong> Difficulty absorbs the improvement: expected
-      scores still converge to 1 while the skill vector stays at zero. The distortion shows up where the skill
-      vector is actually used — cross-task prediction and player-vs-player ranking.</li>
+  <li><strong>Predictions at played tasks stay correct anyway.</strong> Difficulty absorbs the improvement —
+      Δdifficulty = -Δstrength (§2) — so expected scores still converge to 1 while the skill vector under-records
+      it (at cos θ_tu = -1, not at all). The distortion shows up where the skill vector is actually used: cross-task
+      prediction and player-vs-player ranking.</li>
   <li><strong>Unplayed tasks never move.</strong> The skill vector lives in the span of the played directions (rank
       at most one per game, whatever the ambient width), so mastery of unplayed topics is unrepresentable by
       construction; the orthogonal component stays exactly zero.</li>
   <li><strong>Centered strengths are zero-sum over the corpus.</strong> Skill is relative, not absolute: "good at X
-      relative to a typical problem" implies below-average strength somewhere else. This is comparative advantage as
-      geometry — a modeling choice, not a fact about the world. It is the right object for matchmaking (which only
-      ever compares), and the wrong object if a strength drop on an unplayed topic is read as "the player got worse
-      at it".</li>
+      relative to a typical problem" implies below-average strength somewhere else — comparative advantage as
+      geometry, a modeling choice, not a fact about the world. The right object for matchmaking, which only ever
+      compares; the wrong object for reading absolute decline.</li>
 </ul>
 
 <h2>4. Real embedding geometry: anisotropy and the fix</h2>
@@ -504,5 +564,15 @@ the new model's task directions live in a different space, so skill_vector · ta
 sheaf · vector_ratings.html · companion: <a href="embeddings_writeup.html">embeddings_writeup.html</a>
 </footer>
 
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+<script>
+  if (typeof renderMathInElement === "function") {
+    renderMathInElement(document.body, {
+      delimiters: [{left: "$$", right: "$$", display: true}],
+      throwOnError: false
+    });
+  }
+</script>
 </body>
 </html>
