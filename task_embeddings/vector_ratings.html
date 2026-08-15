@@ -230,9 +230,11 @@ expected_score = logistic(strength - difficulty)
   <li><strong>θ &gt; 90°</strong> <em>negative</em>: improving at <code>t</code> scores as decline at <code>u</code>.</li>
 </ul>
 
-<p>The potential for negative transfer is cause for concern. Improving at <code>t</code> doesn't necessitate getting worse at <code>u</code>, and failing spectacularly at <code>u</code> certainly wouldn't cause you to get better at <code>t</code>. This is fortunately not an issue and tends to zero as we increase the dimensionality of our vectors.</p>
+<p>The potential for negative transfer is cause for concern. Improving at <code>t</code> doesn't necessitate getting worse at <code>u</code>, and failing spectacularly at <code>u</code> certainly wouldn't cause you to get better at <code>t</code>. This fortunately decays to zero as we increase the dimensionality of our vectors.</p>
 
-<h3>The pathology metric: p(θ) = max(0, -cos θ)</h3>
+<h3>The pathology metric: ϕ = max(0, -cos θ)</h3>
+
+<p></p>
 
 <figure>
 <svg viewBox="0 0 560 245" width="560">
@@ -256,23 +258,27 @@ expected_score = logistic(strength - difficulty)
       -webkit-mask:radial-gradient(circle 75px at 50% 50%, transparent 65.4px, black 65.6px 74.3px, transparent 74.5px);"></div>
   </foreignObject>
   <line x1="90" y1="115" x2="156" y2="115" stroke="#333" stroke-width="2" marker-end="url(#mT)"/>
-  <text x="90" y="230" font-size="12" fill="#555" text-anchor="middle">d=2: mean(p) = 1/π</text>
+  <text x="90" y="230" font-size="12" fill="#555" text-anchor="middle">d=2: E[ϕ] = 1/π</text>
 
   <circle cx="280" cy="115" r="70" fill="#2563eb"/>
   <circle cx="280" cy="115" r="70" fill="url(#pathGrad)"/>
   <ellipse cx="280" cy="115" rx="70" ry="20" fill="none" stroke="#eee" stroke-width="1" stroke-dasharray="3 3"/>
   <line x1="280" y1="115" x2="280" y2="174" stroke="#333" stroke-width="2" marker-end="url(#mT)"/>
   <circle cx="280" cy="115" r="70" fill="none" stroke="#333" stroke-width="1.5"/>
-  <text x="280" y="230" font-size="12" fill="#555" text-anchor="middle">d=3: mean(p) = 1/4</text>
+  <text x="280" y="230" font-size="12" fill="#555" text-anchor="middle">d=3: E[ϕ] = 1/4</text>
 
   <text x="470" y="124" font-size="28" fill="#333" text-anchor="middle">…</text>
-  <text x="470" y="230" font-size="12" fill="#555" text-anchor="middle">d ≥ 4: mean(p) ≈ 1/√(2πd)</text>
+  <text x="470" y="230" font-size="12" fill="#555" text-anchor="middle">d≥4: E[ϕ] ≈ 1/√(2πd)</text>
 </svg>
 </figure>
 
-<p>"What fraction of the space is pathological" is an average: integrate p over the sphere, divide by its area. The general equation is then:</p>
+<p>"What fraction of the space is pathological" is an average then: integrate ϕ over the sphere's surface, divide by its area:</p>
 
-$$\mathbb{E}[p] = \frac{\Gamma(d/2)}{\sqrt{\pi}\,(d-1)\,\Gamma((d-1)/2)} \approx \frac{1}{\sqrt{2\pi d}}$$
+$$\mathrm{E}[\phi] = \int_{S} \frac{\phi}{A}\,dA = \frac{1}{A}\int_{S} \phi\,dA$$
+
+<p>The general equation is then:</p>
+
+$$\mathrm{E}[\phi] = \frac{\Gamma(d/2)}{\sqrt{\pi}\,(d-1)\,\Gamma((d-1)/2)} \approx \frac{1}{\sqrt{2\pi d}}$$
 
 <h3>Concentration of measure: random vectors in high dimensions are basically orthogonal</h3>
 
@@ -291,88 +297,6 @@ and ≈ 0.42. ln N eats most of √d: forcing even the worst pair below ε needs
 N = 100k). A sprinkling of 0.3–0.4 cells in a pairwise-cosine heatmap is what <em>uniform</em> looks like at
 corpus scale, not evidence of clustering.</p>
 
-<h3>Centering pins the mean: the -1/(N-1) identity</h3>
-
-<p>Real directions are not uniform — they cluster by topic, which §4 measures and fixes by mean-centering. Centering
-has an exact structural consequence: the centered task vectors sum to zero, and their lengths stay ≈ 1, so:</p>
-
-<div class="formula">0 = ‖Σ task_direction_i‖² = Σ‖task_direction_i‖² + 2 * Σ_{i&lt;j} cos θ_ij ≈ N + 2 * Σ cos θ_ij
-→  mean pairwise cosine ≈ -1/(N-1)</div>
-
-<p>The mean is pinned whatever the corpus. That is the whole story of the -0.143 measured on the 8-problem sample
-after mean-centering (embedding_geometry.ipynb §2; see §4): it <em>is</em> -1/7 — a finite-sample identity, not
-evidence of anti-alignment. At corpus scale (N ≈ 100k) the centered mean is ≈ 0, typical pairs near-orthogonal,
-exactly the zero-mean assumption the spread formula in §4 needs.</p>
-
-<h3>From pathology to domain count: K_eff = 1 / mean p</h3>
-
-<p>For any corpus the metric decomposes as mean p = (mean|cos| − mean cos)/2, and centering pins
-mean cos = -1/(N-1) ≈ 0 (above) — so corpus pathology is one pass over the problems table:</p>
-
-<div class="formula">mean p ≈ mean|cos| / 2          K_eff = 1 / mean p</div>
-
-<p>K_eff earns its name. Corpora cluster by topic; after centering, K balanced domains behave like K unit vectors
-summing to ≈ 0, and the same pinning identity at domain level forces the cross-domain cosine:</p>
-
-<div class="formula">mean cross-domain cosine ≈ -1/(K-1)
-K = 2 → -1.0    <span class="dim"># near-exact opposition</span>
-K = 3 → -0.5    K = 8 → -0.14
-<span class="dim"># measured -0.92, -0.46, -0.31, -0.13 for K = 2, 3, 4, 8 — identical at 32 and 1024 dims</span></div>
-
-<p>Cross pairs carry weight (K-1)/K with pathology 1/(K-1), so mean p ≈ 1/K and K_eff ≈ K — measured 2.3, 3.4,
-4.5, 8.8, 17 on synthetic corpora of K = 2, 3, 4, 8, 16 tight domains. At the other end of the dial, a uniform
-sphere scores K_eff = √(2πd) ≈ 40 at d = 256: the isotropic ideal behaves like ~40 balanced opposed domains.
-Every real corpus lands between, and the position is measurable.</p>
-
-<div class="bad"><strong>The oscillation pathology is a low-K_eff phenomenon, not a high-dimensional one.</strong>
-A two-domain corpus ("math vs humanities") after mean-centering puts the domains almost exactly opposite. Training
-both yields near-zero skill credit; training one is scored as active decline in the other. Dimension can neither
-cause nor cure this — the knob is K_eff, not dimension_count.</div>
-
-<h3>The singular limit: credit collapse and the reverse case</h3>
-
-<p>Severity grows monotonically with |cos θ| on the anti-aligned side; no threshold switches the harm on. Cycling
-between tasks T and U nets Δstrength·(1 + cos θ) per cycle for equal-magnitude updates, so credit erodes smoothly
-and collapses only at exact opposition. Simulated alternating play (expected updates, lr = 0.5, true strength 1.0
-on both tasks):</p>
-
-<table>
-  <tr><th>cos θ_tu</th><td>0.0</td><td>-0.3</td><td>-0.5</td><td>-0.7</td><td>-0.9</td><td>-0.99</td></tr>
-  <tr><th>strength recorded (true = 1.0)</th><td>1.00</td><td>1.00</td><td>0.98</td><td>0.83</td><td>0.37</td><td>0.04</td></tr>
-</table>
-
-<p>The catastrophe at cos θ → -1 is exactly the K_eff = 2 corpus: centering forces the domains apart and leaves no
-orthogonal direction for skill to live in.</p>
-
-<p>The reverse case is real and does not saturate: losses at <code>t</code> arrive at anti-aligned <code>u</code>
-as <em>gains</em>. In the K = 2 limit a persistent-loss stream drives gap = strength − difficulty apart at twice
-the strength rate, d(gap)/dn = -2·lr·σ(gap), so gap ≈ -ln(2·lr·n) and</p>
-
-<div class="formula">strength_u ≈ ½·ln(2·lr·n)  →  ∞     <span class="dim"># matches simulation to 3 decimals, n = 10²…2·10⁵</span></div>
-
-<p>Unbounded, but exponentially expensive: s units of illicit strength cost ≈ e^(2s)/(2·lr) consecutive losses
-(≈ 400 for s = 3, ≈ 1.2M for s = 7 at lr = 0.5), and any win pulls back harder than a loss pushes. The live
-version is the exploration-phase newbie or the tilt spiral, not steady play — tracked in §8.</p>
-
-<h3>Consequences for the rating system</h3>
-
-<ul>
-  <li><strong>Predictions at played tasks stay correct anyway.</strong> Difficulty absorbs the improvement —
-      Δdifficulty = -Δstrength (§2) — so expected scores still converge to 1 while the skill vector under-records
-      it (at cos θ_tu = -1, not at all). The distortion shows up where the skill vector is actually used: cross-task
-      prediction and player-vs-player ranking.</li>
-  <li><strong>Unplayed tasks never move.</strong> The skill vector lives in the span of the played directions (rank
-      at most one per game, whatever the ambient width), so mastery of unplayed topics is unrepresentable by
-      construction; the orthogonal component stays exactly zero.</li>
-  <li><strong>Cross-task conservation: centered strengths are zero-sum over the corpus.</strong>
-      Σ_u strength_u = skill_vector · Σ_u task_direction_u = 0 exactly, so every update redistributes skill rather
-      than creating it — the conservation law behind both the erosion and the reverse case above. Skill is
-      relative, not absolute: "good at X
-      relative to a typical problem" implies below-average strength somewhere else — comparative advantage as
-      geometry, a modeling choice, not a fact about the world. The right object for matchmaking, which only ever
-      compares; the wrong object for reading absolute decline.</li>
-</ul>
-
 <h2>4. Real embedding geometry: anisotropy and the fix</h2>
 
 <p>A first-pass derivation gives the spread of a player's strength over randomly chosen tasks as:</p>
@@ -383,7 +307,7 @@ version is the exploration-phase newbie or the tilt spiral, not steady play — 
 random problem's direction is as likely to point one way as any other. Baked into a matchmaking tolerance, that
 assumption looks like:</p>
 
-<div class="formula">tolerance = 0.8416 * ‖skill_vector‖ / √256     <span class="dim"># 0.8416 = Φ⁻¹(0.80), the normal quantile; 256 = MRL-truncated skill dims (embeddings_writeup.html §3)</span></div>
+<div class="formula">tolerance = 0.8416 * ‖skill_vector‖ / √256     <span class="dim"># 0.8416 = CDF⁻¹(0.80), the normal quantile; 256 = MRL-truncated skill dims (embeddings_writeup.html §3)</span></div>
 
 <div class="bad"><strong>The assumption is false.</strong> Real text embeddings are <em>anisotropic</em>: the whole
 cloud occupies a narrow cone, not the sphere. Measured on a handful of deliberately-unrelated STEM problems
