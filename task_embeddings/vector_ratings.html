@@ -11,8 +11,7 @@
     --line: #e2e2e2; --table-line: #dddddd;
     --panel: #f6f7f9; --chip: #f2f3f5;
     --accent: #2563eb;
-    --ok: #16a34a; --ok-bg: #f0fdf4; --ok-border: #22c55e;
-    --warn-bg: #fffbeb; --warn-border: #f59e0b;
+    --ok-bg: #f0fdf4; --ok-border: #22c55e;
     --bad-bg: #fef2f2; --bad-border: #ef4444;
   }
   [data-theme="dark"] {
@@ -21,21 +20,16 @@
     --line: #2d333b; --table-line: #2d333b;
     --panel: #1a1f27; --chip: #1e2228;
     --accent: #6ea8fe;
-    --ok: #4ade80; --ok-bg: rgba(34,197,94,0.10); --ok-border: #22c55e;
-    --warn-bg: rgba(245,158,11,0.10); --warn-border: #f59e0b;
+    --ok-bg: rgba(34,197,94,0.10); --ok-border: #22c55e;
     --bad-bg: rgba(239,68,68,0.10); --bad-border: #f87171;
   }
   html { background: var(--bg); }
   body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--ink);
          line-height: 1.65; max-width: 50rem; margin: 0 auto; padding: 2.5rem 1.25rem 5rem;
          transition: background 0.15s ease, color 0.15s ease; }
-  nav { font-size: 0.9rem; margin-bottom: 2.5rem; color: var(--muted); }
-  nav a { color: var(--accent); text-decoration: none; }
-  nav a:hover { text-decoration: underline; }
   h1 { font-size: 1.9rem; letter-spacing: 0.02em; margin-bottom: 0.2rem; }
   h2 { font-size: 1.3rem; margin-top: 2.8rem; border-bottom: 1px solid var(--line); padding-bottom: 0.3rem; }
   h3 { font-size: 1.05rem; margin-top: 1.8rem; }
-  .subtitle { color: var(--muted); margin-top: 0; }
   .formula { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
              background: var(--panel); border-left: 3px solid var(--accent);
              padding: 0.7rem 1rem; margin: 1rem 0; overflow-x: auto;
@@ -44,24 +38,18 @@
   table { border-collapse: collapse; width: 100%; margin: 1.2rem 0; font-size: 0.92rem; }
   th, td { border: 1px solid var(--table-line); padding: 0.45rem 0.7rem; text-align: left; vertical-align: top; }
   th { background: var(--panel); }
-  .note { background: var(--warn-bg); border-left: 3px solid var(--warn-border); padding: 0.7rem 1rem; margin: 1.2rem 0; }
   .bad  { background: var(--bad-bg); border-left: 3px solid var(--bad-border); padding: 0.7rem 1rem; margin: 1.2rem 0; }
   .good { background: var(--ok-bg); border-left: 3px solid var(--ok-border); padding: 0.7rem 1rem; margin: 1.2rem 0; }
   figure { margin: 1.4rem 0; text-align: center; }
-  figure svg { display: block; margin: 0 auto; }
-  figure:not(:has(figcaption)) { margin-bottom: 1.2rem; }
-  figure:not(:has(figcaption)) + h3 { margin-top: 1.2rem; }
+  figure svg { display: block; margin: 0 auto; max-width: 100%; }
   figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.5rem; }
   code { font-family: ui-monospace, Menlo, Consolas, monospace; background: var(--chip);
          padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
-  footer { margin-top: 4rem; font-size: 0.8rem; color: var(--faint); border-top: 1px solid var(--line); padding-top: 1rem; }
+  .katex { color: inherit; }
+  .katex-display { display: block; margin: 1rem 0; padding: 0.7rem 1rem; background: var(--panel); border-left: 3px solid var(--accent); overflow-x: auto; text-align: left; }
 
-  #theme-toggle { position: fixed; top: 1rem; right: 1rem; width: 3rem; height: 1.6rem;
-                  border-radius: 999px; border: 1px solid var(--table-line); background: var(--panel);
-                  cursor: pointer; padding: 0; z-index: 10; }
-  #theme-toggle .knob { position: absolute; top: 0.15rem; left: 0.15rem; width: 1.2rem; height: 1.2rem;
-                        border-radius: 50%; background: var(--accent); transition: transform 0.15s ease; }
-  [data-theme="dark"] #theme-toggle .knob { transform: translateX(1.4rem); }
+  nav a:hover { text-decoration: underline; }
+  [data-theme="dark"] #theme-knob { transform: translateX(1.4rem); }
 
   [data-theme="dark"] svg [fill="#333"]   { fill: #d1d5db; }
   [data-theme="dark"] svg [stroke="#333"] { stroke: #d1d5db; }
@@ -84,42 +72,39 @@
   [data-theme="dark"] svg [stroke="#ef4444"] { stroke: #f87171; }
   [data-theme="dark"] svg [fill="#7c3aed"]   { fill: #a78bfa; }
   [data-theme="dark"] svg [stroke="#7c3aed"] { stroke: #a78bfa; }
-  .katex { color: inherit; }
-  .katex-display { display: block; margin: 1rem 0; padding: 0.7rem 1rem; background: var(--panel); border-left: 3px solid var(--accent); overflow-x: auto; text-align: left; }
-  [data-theme="dark"] #sphereGrad stop:first-child { stop-color: #94a3b8; }
-  [data-theme="dark"] #sphereGrad stop:nth-child(2) { stop-color: #475569; }
-  [data-theme="dark"] #sphereGrad stop:last-child { stop-color: #1e293b; }
 </style>
 </head>
 <body>
 
-<button id="theme-toggle" aria-label="Toggle dark mode"><span class="knob"></span></button>
+<button id="theme-toggle" aria-label="Toggle dark mode"
+        style="position: fixed; top: 1rem; right: 1rem; width: 3rem; height: 1.6rem; padding: 0;
+               border: 1px solid var(--table-line); border-radius: 999px; background: var(--panel);
+               cursor: pointer; z-index: 10"><span id="theme-knob"
+        style="position: absolute; top: 0.15rem; left: 0.15rem; width: 1.2rem; height: 1.2rem;
+               border-radius: 50%; background: var(--accent); transition: transform 0.15s ease"></span></button>
 <script>
   const themeRoot = document.documentElement;
-  let savedTheme = null;
-  try { savedTheme = localStorage.getItem("sheaf-theme"); } catch (storageError) {}
-  themeRoot.dataset.theme = savedTheme || "dark";
-  document.getElementById("theme-toggle").addEventListener("click", () => {
-    const nextTheme = themeRoot.dataset.theme === "dark" ? "light" : "dark";
-    themeRoot.dataset.theme = nextTheme;
-    try { localStorage.setItem("sheaf-theme", nextTheme); } catch (storageError) {}
-  });
+  try { themeRoot.dataset.theme = localStorage.getItem("sheaf-theme") || "dark"; } catch {}
+  document.getElementById("theme-toggle").onclick = () => {
+    themeRoot.dataset.theme = themeRoot.dataset.theme === "dark" ? "light" : "dark";
+    try { localStorage.setItem("sheaf-theme", themeRoot.dataset.theme); } catch {}
+  };
 </script>
 
-<nav>
+<nav style="font-size: 0.9rem; margin-bottom: 2.5rem; color: var(--muted)">
   task_embeddings /
   <strong>vector_ratings.html</strong> ·
-  <a href="embeddings_writeup.html">embeddings_writeup.html →</a>
+  <a href="embeddings_writeup.html" style="color: var(--accent); text-decoration: none">embeddings_writeup.html →</a>
 </nav>
 
 <h1>Vector Ratings</h1>
-<p class="subtitle">A skill-modelling framework for sheaf that generalizes scalar Elo to a high-dimensional space.
+<p style="color: var(--muted); margin-top: 0">A skill-modelling framework for sheaf that generalizes scalar Elo to a high-dimensional space.
 Direction encodes <em>what</em> you are good at, magnitude encodes how <em>good</em> you are.</p>
 
-<p>Classical Elo gives every player and every problem one number; this does not generalize well to tasks of varying type: a player can be strong at combinatorics and weak at calculus, and a single scalar cannot express this. So both sides of a game become geometric objects:</p>
+<p>Classical Elo gives every player and every problem one number; this does not generalize well to tasks of varying type: a player can be strong in algebra but weak in geometry; a single scalar cannot express this. To fix this, our model uses rating vectors to represent skill composition:</p>
 
 <ul>
-  <li>A <strong>player's</strong> strengths are represented by a <code>skill_vector</code>; direction encodes skill composition (what types of problems they are good at), length encodes strength.</li>
+  <li>A <strong>player's</strong> strengths are represented by a <code>skill_vector</code> where direction encodes skill composition (what types of problems they are good at), and length encodes strength.</li>
   <li>A <strong>problem</strong> is a unit vector, the <code>task_direction</code>, plus a scalar <code>difficulty</code>. The direction says what the problem is about; the scalar says how hard it is.</li>
 </ul>
 
@@ -152,7 +137,7 @@ rating_b = ln(strength_b)
 <p>The win probability now depends only on the difference of log-strengths. Equal rating differences mean equal win probabilities at every level of play, which is exactly why ratings live on an additive scale.</p>
 
 <figure>
-<svg viewBox="0 0 520 300" width="520" style="max-width:100%">
+<svg viewBox="0 0 520 300" width="520">
   <rect x="190.7" y="30" width="138.6" height="220" fill="#f0fdf4"/>
   <line x1="60" y1="250" x2="480" y2="250" stroke="#333" stroke-width="1"/>
   <line x1="260" y1="250" x2="260" y2="30" stroke="#ccc" stroke-width="1"/>
@@ -179,7 +164,7 @@ rating_b = ln(strength_b)
 <p>Score a win as 1 and a loss as 0; then the sigmoid's output is the expected score:</p>
 
 <div class="formula">expected_score = 1 * P(win) + 0 * P(loss)</div>
-  
+
 <p>After the game, move the rating toward the observation, in proportion to the prediction error scaled by <code>learning_rate</code> (Elo's K-factor):</p>
 
 <div class="formula">Δrating = (observed_score - expected_score) * learning_rate</div>
@@ -188,8 +173,8 @@ rating_b = ln(strength_b)
 
 <p>A scalar rating assumes a single axis of ability; the <code>skill_vector</code> model drops this assumption. Section 1's rating difference becomes the difference between the player's projected <code>strength</code> on the task and the problem's <code>difficulty</code>; everything else carries over unchanged.</p>
 
-<figure>
-<svg viewBox="0 0 520 280" width="520" style="max-width:100%">
+<figure style="margin-bottom: 1.2rem">
+<svg viewBox="0 0 520 280" width="520">
   <defs>
     <marker id="mBlue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
       <path d="M0,0 L7,3 L0,6 Z" fill="#2563eb"/>
@@ -277,7 +262,7 @@ corpus scale, not evidence of clustering.</p>
 <div class="formula">p(θ) = max(0, -cos θ)     <span class="dim"># share of a gain at t that lands as a loss at u; 0 on the aligned hemisphere, 1 at exact opposition</span></div>
 
 <figure>
-<svg viewBox="0 0 560 245" width="560" style="max-width:100%">
+<svg viewBox="0 0 560 245" width="560">
   <defs>
     <marker id="mT" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
       <path d="M0,0 L7,3 L0,6 Z" fill="#333"/>
@@ -454,7 +439,7 @@ all-STEM corpus sits much deeper in the cone (0.3-0.6 typical). Consequences:</d
 </ul>
 
 <figure>
-<svg viewBox="0 0 560 260" width="560" style="max-width:100%">
+<svg viewBox="0 0 560 260" width="560">
   <circle cx="140" cy="130" r="95" fill="none" stroke="#ddd"/>
   <g stroke="#2563eb" stroke-width="1.6">
     <line x1="140" y1="130" x2="219.9" y2="100.9"/><line x1="140" y1="130" x2="175.9" y2="53.0"/>
@@ -581,7 +566,7 @@ the new model's task directions live in a different space, so skill_vector · ta
       are calibrated on the same scale by construction.</li>
 </ul>
 
-<footer>
+<footer style="margin-top: 4rem; font-size: 0.8rem; color: var(--faint); border-top: 1px solid var(--line); padding-top: 1rem">
 sheaf · vector_ratings.html · companion: <a href="embeddings_writeup.html">embeddings_writeup.html</a>
 </footer>
 
