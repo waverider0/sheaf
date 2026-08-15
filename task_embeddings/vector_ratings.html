@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -98,8 +98,7 @@
   const themeRoot = document.documentElement;
   let savedTheme = null;
   try { savedTheme = localStorage.getItem("sheaf-theme"); } catch (storageError) {}
-  themeRoot.dataset.theme = savedTheme ||
-    (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  themeRoot.dataset.theme = savedTheme || "dark";
   document.getElementById("theme-toggle").addEventListener("click", () => {
     const nextTheme = themeRoot.dataset.theme === "dark" ? "light" : "dark";
     themeRoot.dataset.theme = nextTheme;
@@ -249,118 +248,102 @@ expected_score = logistic(strength - difficulty)
   <li><strong>θ &gt; 90°</strong> <em>negative</em>: improving at <code>t</code> scores as decline at <code>u</code>.</li>
 </ul>
 
-<h3>A pathology in low dimensions: oscillation</h3>
+<p>How much does negative transfer matter? Two exact viewpoints, from opposite directions: <strong>concentration
+of measure</strong> describes how alignment itself scales with <code>dimension_count</code>; the <strong>pathology
+metric</strong> measures the severity of negative transfer with no threshold at all. Together they pin down what
+improves with dimension and what never does.</p>
 
-<p>The transfer law miscredits symmetric improvement at anti-aligned tasks: two opposed tasks credit a player who
-wins at both at less than half rate — at exact opposition, not at all. Whether that matters is geometric: under
-uniform random directions anti-alignment is exponentially rare, but real corpora cluster, and after mean-centering
-the risk is set by the number of domains, not the dimension.</p>
+<h3>Concentration of measure: alignment is the anomaly</h3>
 
-<p>Take tasks t and u with <code>cos θ_tu</code> and a player who wins at both. A win at t adds
-<code>Δstrength_t</code> to strength at t and transfers <code>Δstrength_t * cos θ_tu</code> to strength at u; a
-win at u adds <code>Δstrength_u</code> to strength at u and transfers <code>Δstrength_u * cos θ_ut</code> to
-strength at t. One t,u cycle then nets:</p>
+<p>Fix any task direction <code>t</code>. For a uniform random <code>u</code>, cos θ_tu is a single coordinate of
+<code>u</code>, and exchangeability (Σ u_i² = 1) gives the master identity — exact at every d, no asymptotics:</p>
 
-<div class="formula"
->Δstrength_t (per cycle)   = Δstrength_t + Δstrength_u * cos θ_ut
+<div class="formula">E[cos θ] = 0     E[cos² θ] = 1/d     →     sd(cos θ) = 1/√d</div>
 
-Δskill_vector (per cycle) = task_direction_t * Δstrength_t + task_direction_u * Δstrength_u
-</div>
+<p>Random directions concentrate at 90° ± 1/√d: in high dimension, near-orthogonality is the default and alignment
+is the anomaly that structure (clustering, anisotropy — §4) must earn. The tails are sub-gaussian,
+P(|cos θ| &gt; ε) ~ e^(-d·ε²/2), so any <em>fixed</em> alignment level becomes exponentially rare in d.</p>
 
-<p>The pathology is symmetric improvement — a player who genuinely gets better at <em>both</em> tasks, so the two
-wins move strength equally. Set <code>Δstrength_t = Δstrength_u</code>; the cycle then nets:</p>
+<p>Concentration governs the <em>bulk</em>, not the extremes. Over a corpus of N problems, the worst alignment to
+a fixed task scales like √(2 ln N / d) and the worst pair like √(4 ln N / d) — at d = 256, N = 100k that is ≈ 0.30
+and ≈ 0.42. ln N eats most of √d: forcing even the worst pair below ε needs d ≳ 4 ln N / ε² (≈ 460 for ε = 0.2 at
+N = 100k). A sprinkling of 0.3–0.4 cells in a pairwise-cosine heatmap is what <em>uniform</em> looks like at
+corpus scale, not evidence of clustering.</p>
 
-<div class="formula">Δstrength_t (per cycle) = Δstrength_t * (1 + cos θ_tu)</div>
+<h3>The pathology metric: p(θ) = max(0, -cos θ)</h3>
 
-<p>The <code>1</code> is its own win, the <code>cos θ_tu</code> is the transfer from the other. The transfer also
-swings the other task by <code>Δstrength_t * cos θ_tu</code> each game, negative for cos θ_tu &lt; 0 — improving at
-t reads as decline at u:</p>
+<p>Anti-alignment is not binary; measure the negative-transfer fraction directly:</p>
 
-<table>
-  <tr><th>cos θ_tu</th><th>θ_tu</th><th>credit at t per cycle (1 + cos θ_tu)</th><th>swing at u per game |cos θ_tu|</th></tr>
-  <tr><td>-1.0 (opposed)</td><td>180°</td><td>0</td><td>1.0</td></tr>
-  <tr><td>-0.5</td><td>120°</td><td>0.5</td><td>0.5</td></tr>
-  <tr><td>0 (orthogonal)</td><td>90°</td><td>1.0</td><td>0</td></tr>
-  <tr><td>+0.5</td><td>60°</td><td>1.5</td><td>0.5</td></tr>
-  <tr><td>+0.9</td><td>26°</td><td>1.9</td><td>0.9</td></tr>
-</table>
-
-<p>At exact opposition (cos θ_tu = -1) symmetric improvement credits nothing: every win hands back exactly what the
-last one took, strength at t oscillates by <code>Δstrength_t</code> per game without growing, and the skill vector
-never moves. This is not a failure of specialization — win at t and lose at u, and the skill vector moves by
-<code>Δstrength_t - Δstrength_u</code> along <code>task_direction_t</code>, so the model records
-"better at t than u" correctly. The failure is specific to symmetric improvement: a player who genuinely gets
-better at <em>both sides</em> of an opposed pair receives no skill credit at all.</p>
-
-<h3>The null model: random directions</h3>
-
-<p>How common is anti-alignment? Under the null model, task directions are independent and uniform over the unit
-sphere; the cosine of a random pair has mean 0 — by symmetry, every pair at cosine c is matched by one at -c — and
-variance:</p>
-
-<div class="formula">Var[cos θ] = 1/dimension_count
-              <span class="dim"># a random unit vector has E[u_j²] = 1/dimension_count (squares sum to 1, coordinates symmetric);
-              # independence: E[(u · v)²] = Σ_j E[u_j²] * E[v_j²] = dimension_count * (1/dimension_count)²</span></div>
-
-<p>So random directions concentrate at orthogonality: √dimension_count * cos θ is approximately standard normal, so
-mean |cos θ| ≈ √(2/π)/√dimension_count ≈ 0.8/√dimension_count — 0.04 at 384 dims — and strong anti-alignment is
-exponentially rare: the tail is Gaussian for small c, P(cos θ ≤ -c) ≈ Φ(-c * √dimension_count) <span class="dim"># Φ = standard normal CDF</span>, and
-for fixed c decays like (1 - c²)^(dimension_count / 2) — the exact rate, derived below. At 384 dims, a pair as anti-aligned as -0.2 occurs with probability ≈ 4e-5.
-Under the null model the pathology essentially cannot happen: high dimension destroys spurious anti-alignment.</p>
-
-<p>Make it concrete. Call a pair pathological when cos θ ≤ -0.5 — the transfer cancels at least half the win, so
-the angle is within 60° of exact opposition. In 2 dimensions that is exactly 1/3 of the circle (the 120° arc from
-120° to 240°); the fraction only shrinks with dimension — 1/4 at 3, ≈ 1/5 at 4, 8% at 8, 2% at 16, and
-≈ 5e-26 at 384. One third is the worst case, and it is a low-dimensional
-pathology under the null model.</p>
+<div class="formula">p(θ) = max(0, -cos θ)     <span class="dim"># share of a gain at t that lands as a loss at u; 0 on the aligned hemisphere, 1 at exact opposition</span></div>
 
 <figure>
 <svg viewBox="0 0 560 245" width="560" style="max-width:100%">
-  <circle cx="90" cy="115" r="70" fill="none" stroke="#333" stroke-width="1.5"/>
-  <line x1="12" y1="115" x2="168" y2="115" stroke="#ccc" stroke-width="1"/>
-  <line x1="90" y1="28" x2="90" y2="202" stroke="#ccc" stroke-width="1"/>
-  <line x1="90" y1="115" x2="55" y2="54.38" stroke="#ef4444" stroke-width="1" opacity="0.55"/>
-  <line x1="90" y1="115" x2="55" y2="175.62" stroke="#ef4444" stroke-width="1" opacity="0.55"/>
-  <path d="M 55 54.38 A 70 70 0 0 0 55 175.62" fill="none" stroke="#ef4444" stroke-width="4" stroke-linecap="round"/>
-  <text x="90" y="230" font-size="12" fill="#555" text-anchor="middle">d = 2 — a 120° arc (1/3)</text>
+  <defs>
+    <marker id="mT" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#333"/>
+    </marker>
+    <radialGradient id="pathGrad" gradientUnits="userSpaceOnUse" cx="280" cy="45" r="85">
+      <stop offset="0%"  stop-color="#ef4444"/>
+      <stop offset="50%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </radialGradient>
+  </defs>
 
-  <circle cx="280" cy="115" r="70" fill="#dde3ea" stroke="#333" stroke-width="1.5"/>
-  <line x1="280" y1="28" x2="280" y2="202" stroke="#ccc" stroke-width="1"/>
-  <line x1="202" y1="115" x2="358" y2="115" stroke="#ccc" stroke-width="1"/>
-  <line x1="280" y1="115" x2="244.3" y2="104" stroke="#ef4444" stroke-width="1" opacity="0.55"/>
-  <line x1="280" y1="115" x2="315.7" y2="104" stroke="#ef4444" stroke-width="1" opacity="0.55"/>
-  <path d="M 338.4 76.4 A 60.62 25.62 0 0 0 221.6 76.4" fill="none" stroke="#999" stroke-width="1" stroke-dasharray="3 3"/>
-  <path d="M 221.6 76.4 A 60.62 25.62 0 1 0 338.4 76.4 A 70 70 0 0 0 221.6 76.4 Z" fill="#ef4444" opacity="0.8" stroke="#ef4444" stroke-width="1.5"/>
-  <text x="280" y="230" font-size="12" fill="#555" text-anchor="middle">d = 3 — a spherical cap (1/4)</text>
+  <line x1="12" y1="115" x2="168" y2="115" stroke="#ccc" stroke-width="1"/>
+  <line x1="90" y1="30" x2="90" y2="200" stroke="#999" stroke-width="1" stroke-dasharray="4 3"/>
+<foreignObject x="15" y="40" width="150" height="150">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="width:150px;height:150px;
+      background:conic-gradient(from 0deg at 50% 50%, rgb(37, 99, 235) 0deg, rgb(37, 99, 235) 10deg, rgb(37, 99, 235) 20deg, rgb(37, 99, 235) 30deg, rgb(37, 99, 235) 40deg, rgb(37, 99, 235) 50deg, rgb(37, 99, 235) 60deg, rgb(37, 99, 235) 70deg, rgb(37, 99, 235) 80deg, rgb(37, 99, 235) 90deg, rgb(37, 99, 235) 100deg, rgb(37, 99, 235) 110deg, rgb(37, 99, 235) 120deg, rgb(37, 99, 235) 130deg, rgb(37, 99, 235) 140deg, rgb(37, 99, 235) 150deg, rgb(37, 99, 235) 160deg, rgb(37, 99, 235) 170deg, rgb(37, 99, 235) 180deg, rgb(67, 85, 236) 190deg, rgb(97, 71, 236) 200deg, rgb(124, 58, 237) 210deg, rgb(157, 61, 189) 220deg, rgb(185, 63, 147) 230deg, rgb(208, 65, 113) 240deg, rgb(225, 67, 88) 250deg, rgb(236, 68, 73) 260deg, rgb(239, 68, 68) 270deg, rgb(236, 68, 73) 280deg, rgb(225, 67, 88) 290deg, rgb(208, 65, 113) 300deg, rgb(185, 63, 147) 310deg, rgb(157, 61, 189) 320deg, rgb(124, 58, 237) 330deg, rgb(97, 71, 236) 340deg, rgb(67, 85, 236) 350deg, rgb(37, 99, 235) 360deg);
+      mask:radial-gradient(circle 75px at 50% 50%, transparent 65.4px, black 65.6px 74.3px, transparent 74.5px);
+      -webkit-mask:radial-gradient(circle 75px at 50% 50%, transparent 65.4px, black 65.6px 74.3px, transparent 74.5px);"></div>
+  </foreignObject>
+  <line x1="90" y1="115" x2="156" y2="115" stroke="#333" stroke-width="2" marker-end="url(#mT)"/>
+  <text x="90" y="230" font-size="12" fill="#555" text-anchor="middle">d = 2 — mean p = 1/π</text>
+
+  <circle cx="280" cy="115" r="70" fill="#2563eb"/>
+  <circle cx="280" cy="115" r="70" fill="url(#pathGrad)"/>
+  <ellipse cx="280" cy="115" rx="70" ry="20" fill="none" stroke="#eee" stroke-width="1" stroke-dasharray="3 3"/>
+  <line x1="280" y1="115" x2="280" y2="174" stroke="#333" stroke-width="2" marker-end="url(#mT)"/>
+  <circle cx="280" cy="115" r="70" fill="none" stroke="#333" stroke-width="1.5"/>
+  <text x="280" y="230" font-size="12" fill="#555" text-anchor="middle">d = 3 — mean p = 1/4</text>
 
   <text x="470" y="124" font-size="28" fill="#333" text-anchor="middle">…</text>
-  <text x="470" y="230" font-size="12" fill="#555" text-anchor="middle">d ≥ 4 — (1-c²)^(d/2)</text>
+  <text x="470" y="230" font-size="12" fill="#555" text-anchor="middle">d ≥ 4 — mean p ~ 1/√(2πd)</text>
 </svg>
-<figcaption>The pathological set (cos θ ≤ -0.5): a 120° arc of the circle, a spherical cap of the sphere, and a
-vanishing slice beyond. Directions are unit vectors, so fractions are measured on the boundary — arc over
-circumference, cap area over sphere area. The cone from the center through the set fills the same fraction of the
-disk or ball (the plane-cut cap solid does not). Slicing by u · t = -c leaves a sphere one dimension down — the cap
-is a solid of revolution.</figcaption>
+<figcaption>The pathology metric as a continuous shade: blue is p = 0 (the whole aligned hemisphere), red is
+p = 1 at exact opposition, purple the 120°/240° rays. "How much of the space is pathological" is the average of
+the shade over the surface: 1/π on the circle, 1/4 on the sphere, ~ 1/√(2πd) beyond — severity washes out with
+dimension even though the anti-aligned hemisphere is always half the space.</figcaption>
 </figure>
 
-<p>Exactly, and the fraction has a closed form. Fix <code>t = e₁</code> (the +x axis); the pathological set is the
-cap <code>{u : u · t ≤ -c}</code>, and its fraction of the sphere is the regularized incomplete beta function:</p>
+<p>"What fraction of the space is pathological" is then an average — the same operation as averaging a function
+over an interval: integrate p over the sphere, divide by its area. The ceiling is 1/2 at every dimension (the
+whole anti-aligned hemisphere at full severity); the actual average is lower and decays, because severity is thin
+near the equator. For d = 3, cos θ is uniform on [-1, 1], so the sphere average <em>is</em> the interval
+average:</p>
 
-$$F_d(c) = \mathrm{I}_{(1-c)/2}\!\left(\tfrac{d-1}{2},\ \tfrac{d-1}{2}\right)$$
+$$d = 2:\ \frac{1}{2\pi}\int_0^{2\pi}\! p\; d\theta = \frac{1}{\pi} \approx 0.318 \qquad d = 3:\ \frac{1}{2}\int_{-1}^{0}(-x)\,dx = \frac{1}{4}$$
 
-<p>which for integer <code>d</code> collapses to elementary forms, split by parity:</p>
+<p>In general, exact at every d:</p>
 
-$$F_2 = \frac{\arccos c}{\pi},\quad F_3 = \frac{1-c}{2},\quad F_4 = \frac{\arccos c - c\sqrt{1-c^2}}{\pi},\quad F_5 = \frac{2-3c+c^3}{4}$$
+$$\mathbb{E}[p] = \frac{\Gamma(d/2)}{\sqrt{\pi}\,(d-1)\,\Gamma((d-1)/2)} \approx \frac{1}{\sqrt{2\pi d}}$$
 
-<p>odd <code>d</code> is a polynomial in <code>c</code>; even <code>d</code> is <code>arccos c</code> minus a
-polynomial multiple of <code>√(1-c²)</code>. The recursion between dimensions is the surface-of-revolution step:</p>
+<p>Two more exact facts complete the picture. The frequency never changes: P(p &gt; 0) = 1/2 at every d — half of
+all random task pairs are anti-aligned; a hemisphere is a hemisphere. And the second moment is E[p²] = 1/(2d).
+What vanishes with d is never frequency, only severity:</p>
 
-$$F_d(c) = F_{d-2}(c) - \frac{\Gamma\!\left(\tfrac{d-2}{2}\right)}{2\sqrt{\pi}\,\Gamma\!\left(\tfrac{d-1}{2}\right)}\, c\,(1-c^2)^{(d-3)/2}$$
+<table>
+  <tr><th>dimension_count</th><th>sd(cos θ) = 1/√d</th><th>E[p] ≈ 1/√(2πd)</th><th>√E[p²] = 1/√(2d)</th></tr>
+  <tr><td>64</td><td>0.125</td><td>0.050</td><td>0.088</td></tr>
+  <tr><td>128</td><td>0.088</td><td>0.035</td><td>0.062</td></tr>
+  <tr><td>256</td><td>0.062</td><td>0.025</td><td>0.044</td></tr>
+  <tr><td>384</td><td>0.051</td><td>0.020</td><td>0.036</td></tr>
+</table>
 
-<p>with <code>F₁ = 1/2</code> and <code>F₂ = arccos c / π</code>. For large <code>d</code> the exact rate is the
-large-deviation tail, not the Gaussian one:</p>
-
-$$F_d(c) \sim \frac{(1-c^2)^{(d-1)/2}}{c\sqrt{2\pi(d-3)}} \sim (1-c^2)^{d/2}$$
+<p>A thresholded zone like cos θ ≤ -0.5 mixes the two perspectives: its <em>frequency</em> vanishes exponentially
+(the sub-gaussian tails above) while <em>mean</em> severity vanishes polynomially (here) — the same concentration
+fact from two sides. Both statements concern the uniform prior. Real corpora are anisotropic and clustered, and
+there the metric has a sharper reading: as a domain count.</p>
 
 <h3>Centering pins the mean: the -1/(N-1) identity</h3>
 
@@ -375,21 +358,55 @@ after mean-centering (embedding_geometry.ipynb §2; see §4): it <em>is</em> -1/
 evidence of anti-alignment. At corpus scale (N ≈ 100k) the centered mean is ≈ 0, typical pairs near-orthogonal,
 exactly the zero-mean assumption the spread formula in §4 needs.</p>
 
-<h3>Clusters: the pathology is domain count, not dimension</h3>
+<h3>From pathology to domain count: K_eff = 1 / mean p</h3>
 
-<p>The identity pins the mean; the structure lives in the spread — and there the pathology returns, at any
-dimension. Corpora cluster by topic; after centering, K balanced domains have centers that behave like K unit
-vectors summing to ≈ 0, and the same identity at domain level pins the cross-domain cosine:</p>
+<p>For any corpus the metric decomposes as mean p = (mean|cos| − mean cos)/2, and centering pins
+mean cos = -1/(N-1) ≈ 0 (above) — so corpus pathology is one pass over the problems table:</p>
+
+<div class="formula">mean p ≈ mean|cos| / 2          K_eff = 1 / mean p</div>
+
+<p>K_eff earns its name. Corpora cluster by topic; after centering, K balanced domains behave like K unit vectors
+summing to ≈ 0, and the same pinning identity at domain level forces the cross-domain cosine:</p>
 
 <div class="formula">mean cross-domain cosine ≈ -1/(K-1)
 K = 2 → -1.0    <span class="dim"># near-exact opposition</span>
 K = 3 → -0.5    K = 8 → -0.14
 <span class="dim"># measured -0.92, -0.46, -0.31, -0.13 for K = 2, 3, 4, 8 — identical at 32 and 1024 dims</span></div>
 
-<div class="bad"><strong>The oscillation pathology is a low-domain-count phenomenon, not a high-dimensional one.</strong>
+<p>Cross pairs carry weight (K-1)/K with pathology 1/(K-1), so mean p ≈ 1/K and K_eff ≈ K — measured 2.3, 3.4,
+4.5, 8.8, 17 on synthetic corpora of K = 2, 3, 4, 8, 16 tight domains. At the other end of the dial, a uniform
+sphere scores K_eff = √(2πd) ≈ 40 at d = 256: the isotropic ideal behaves like ~40 balanced opposed domains.
+Every real corpus lands between, and the position is measurable.</p>
+
+<div class="bad"><strong>The oscillation pathology is a low-K_eff phenomenon, not a high-dimensional one.</strong>
 A two-domain corpus ("math vs humanities") after mean-centering puts the domains almost exactly opposite. Training
-both yields near-zero skill credit; training one is scored as active decline in the other. The knob that controls
-the pathology is the number of effective domains K, not dimension_count.</div>
+both yields near-zero skill credit; training one is scored as active decline in the other. Dimension can neither
+cause nor cure this — the knob is K_eff, not dimension_count.</div>
+
+<h3>The singular limit: credit collapse and the reverse case</h3>
+
+<p>Severity grows monotonically with |cos θ| on the anti-aligned side; no threshold switches the harm on. Cycling
+between tasks T and U nets Δstrength·(1 + cos θ) per cycle for equal-magnitude updates, so credit erodes smoothly
+and collapses only at exact opposition. Simulated alternating play (expected updates, lr = 0.5, true strength 1.0
+on both tasks):</p>
+
+<table>
+  <tr><th>cos θ_tu</th><td>0.0</td><td>-0.3</td><td>-0.5</td><td>-0.7</td><td>-0.9</td><td>-0.99</td></tr>
+  <tr><th>strength recorded (true = 1.0)</th><td>1.00</td><td>1.00</td><td>0.98</td><td>0.83</td><td>0.37</td><td>0.04</td></tr>
+</table>
+
+<p>The catastrophe at cos θ → -1 is exactly the K_eff = 2 corpus: centering forces the domains apart and leaves no
+orthogonal direction for skill to live in.</p>
+
+<p>The reverse case is real and does not saturate: losses at <code>t</code> arrive at anti-aligned <code>u</code>
+as <em>gains</em>. In the K = 2 limit a persistent-loss stream drives gap = strength − difficulty apart at twice
+the strength rate, d(gap)/dn = -2·lr·σ(gap), so gap ≈ -ln(2·lr·n) and</p>
+
+<div class="formula">strength_u ≈ ½·ln(2·lr·n)  →  ∞     <span class="dim"># matches simulation to 3 decimals, n = 10²…2·10⁵</span></div>
+
+<p>Unbounded, but exponentially expensive: s units of illicit strength cost ≈ e^(2s)/(2·lr) consecutive losses
+(≈ 400 for s = 3, ≈ 1.2M for s = 7 at lr = 0.5), and any win pulls back harder than a loss pushes. The live
+version is the exploration-phase newbie or the tilt spiral, not steady play — tracked in §8.</p>
 
 <h3>Consequences for the rating system</h3>
 
@@ -401,7 +418,10 @@ the pathology is the number of effective domains K, not dimension_count.</div>
   <li><strong>Unplayed tasks never move.</strong> The skill vector lives in the span of the played directions (rank
       at most one per game, whatever the ambient width), so mastery of unplayed topics is unrepresentable by
       construction; the orthogonal component stays exactly zero.</li>
-  <li><strong>Centered strengths are zero-sum over the corpus.</strong> Skill is relative, not absolute: "good at X
+  <li><strong>Cross-task conservation: centered strengths are zero-sum over the corpus.</strong>
+      Σ_u strength_u = skill_vector · Σ_u task_direction_u = 0 exactly, so every update redistributes skill rather
+      than creating it — the conservation law behind both the erosion and the reverse case above. Skill is
+      relative, not absolute: "good at X
       relative to a typical problem" implies below-average strength somewhere else — comparative advantage as
       geometry, a modeling choice, not a fact about the world. The right object for matchmaking, which only ever
       compares; the wrong object for reading absolute decline.</li>
@@ -417,7 +437,7 @@ the pathology is the number of effective domains K, not dimension_count.</div>
 random problem's direction is as likely to point one way as any other. Baked into a matchmaking tolerance, that
 assumption looks like:</p>
 
-<div class="formula">tolerance = 0.8416 * ‖skill_vector‖ / √1536     <span class="dim"># 0.8416 = Φ⁻¹(0.80), the normal quantile</span></div>
+<div class="formula">tolerance = 0.8416 * ‖skill_vector‖ / √256     <span class="dim"># 0.8416 = Φ⁻¹(0.80), the normal quantile; 256 = MRL-truncated skill dims (embeddings_writeup.html §3)</span></div>
 
 <div class="bad"><strong>The assumption is false.</strong> Real text embeddings are <em>anisotropic</em>: the whole
 cloud occupies a narrow cone, not the sphere. Measured on a handful of deliberately-unrelated STEM problems
@@ -540,6 +560,7 @@ the new model's task directions live in a different space, so skill_vector · ta
   <tr><td>No uncertainty term</td><td>A 5-game player and a 500-game player are treated with equal confidence</td><td>Future: per-player uncertainty scalar (Glicko-style RD), modulate learning_rate by it</td></tr>
   <tr><td>Skill-norm drift</td><td>‖skill_vector‖ grows with games played; bands inflate</td><td>Monitor norm distribution; consider normalizing norms or decaying learning_rate</td></tr>
   <tr><td>Semantic ≠ skill axes</td><td>Transfer follows embedding similarity whether or not real skill transfers that way</td><td>Validate against realized win rates; accept as modeling assumption (§3, §4)</td></tr>
+  <tr><td>Anti-aligned inflation</td><td>Persistent losses at t inflate strength on unplayed anti-aligned tasks as ½·ln(2·lr·n); P(win) → 1 with zero games played</td><td>Exponentially slow (s units cost ~e^(2s)/(2·lr) consecutive losses); monitor ‖skill_vector‖, cap or decay if observed (§3)</td></tr>
   <tr><td>Model swap</td><td>All ratings silently invalidated</td><td>Version everything; treat as migration (§7)</td></tr>
   <tr><td>Difficulty identifiability</td><td>Rarely-played problems have garbage difficulty</td><td>Display play-count confidence next to difficulty</td></tr>
 </table>
