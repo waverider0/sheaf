@@ -101,17 +101,14 @@
 <p style="color: var(--muted); margin-top: 0">A skill-modelling framework for sheaf that generalizes scalar Elo to a high-dimensional space.
 Direction encodes <em>what</em> you are good at, magnitude encodes how <em>good</em> you are.</p>
 
-<p>Classical Elo gives every player and every problem one number; this does not generalize well to tasks of varying type: a player can be strong in algebra but weak in geometry; a single scalar cannot express this. To fix this, our model uses rating vectors to represent skill composition:</p>
+<p>Classical Elo gives every player and every problem one number; this does not generalize well to tasks of varying type: a player can be strong in algebra and weak in geometry, but a single scalar cannot express this. To fix this, our model uses rating vectors to represent skill composition:</p>
 
 <ul>
   <li>A <strong>player's</strong> strengths are represented by a <code>skill_vector</code> where direction encodes skill composition (what types of problems they are good at), and length encodes strength.</li>
   <li>A <strong>problem</strong> is a unit vector, the <code>task_direction</code>, plus a scalar <code>difficulty</code>. The direction says what the problem is about; the scalar says how hard it is.</li>
 </ul>
 
-<p>The <code>task_direction</code> comes from a text-embedding model run over the problem statement
-(see <a href="embeddings_writeup.html">embeddings_writeup.html</a> for which model and why). Semantically similar
-problems point in similar directions; playing one problem teaches
-the system something about your strength on <em>nearby</em> problems.</p>
+<p>The <code>task_direction</code> comes from a text-embedding model run over the problem's solution (see <a href="embeddings_writeup.html">embeddings_writeup.html</a> for which model and why). Problems with semantically similar solutions point in similar directions; playing one problem teaches the system something about your strength on <em>nearby</em> problems.</p>
 
 <h2>1. Classical Elo derivation</h2>
 
@@ -228,38 +225,14 @@ expected_score = logistic(strength - difficulty)
 <p>A game transfers <code>cos θ_tu</code> of its strength change to every other task:</p>
 
 <ul>
-  <li><strong>θ &lt; 90°</strong> positive: semantically similar problems "teach" each other.</li>
-  <li><strong>θ = 90°</strong> nothing: change along <code>t</code> changes nothing along <code>u</code>.</li>
+  <li><strong>θ &lt; 90°</strong> positive: similar problems "teach" each other.</li>
+  <li><strong>θ = 90°</strong> zero: change along <code>t</code> changes nothing along <code>u</code>.</li>
   <li><strong>θ &gt; 90°</strong> <em>negative</em>: improving at <code>t</code> scores as decline at <code>u</code>.</li>
 </ul>
 
-<p>How much does negative transfer matter? Two exact viewpoints, from opposite directions: <strong>concentration
-of measure</strong> describes how alignment itself scales with <code>dimension_count</code>; the <strong>pathology
-metric</strong> measures the severity of negative transfer with no threshold at all. Together they pin down what
-improves with dimension and what never does.</p>
-
-<h3>Concentration of measure: alignment is the anomaly</h3>
-
-<p>Fix any task direction <code>t</code>. For a uniform random <code>u</code>, cos θ_tu is a single coordinate of
-<code>u</code>, and exchangeability (Σ u_i² = 1) gives the master identity — exact at every d, no asymptotics:</p>
-
-<div class="formula">E[cos θ] = 0     E[cos² θ] = 1/d     →     sd(cos θ) = 1/√d</div>
-
-<p>Random directions concentrate at 90° ± 1/√d: in high dimension, near-orthogonality is the default and alignment
-is the anomaly that structure (clustering, anisotropy — §4) must earn. The tails are sub-gaussian,
-P(|cos θ| &gt; ε) ~ e^(-d·ε²/2), so any <em>fixed</em> alignment level becomes exponentially rare in d.</p>
-
-<p>Concentration governs the <em>bulk</em>, not the extremes. Over a corpus of N problems, the worst alignment to
-a fixed task scales like √(2 ln N / d) and the worst pair like √(4 ln N / d) — at d = 256, N = 100k that is ≈ 0.30
-and ≈ 0.42. ln N eats most of √d: forcing even the worst pair below ε needs d ≳ 4 ln N / ε² (≈ 460 for ε = 0.2 at
-N = 100k). A sprinkling of 0.3–0.4 cells in a pairwise-cosine heatmap is what <em>uniform</em> looks like at
-corpus scale, not evidence of clustering.</p>
+<p>The potential for negative transfer is cause for concern. Improving at <code>t</code> doesn't necessitate getting worse at <code>u</code>, and failing spectacularly at <code>u</code> certainly wouldn't cause you to get better at <code>t</code>. This is fortunately not an issue and tends to zero as we increase the dimensionality of our vectors.</p>
 
 <h3>The pathology metric: p(θ) = max(0, -cos θ)</h3>
-
-<p>Anti-alignment is not binary; measure the negative-transfer fraction directly:</p>
-
-<div class="formula">p(θ) = max(0, -cos θ)     <span class="dim"># share of a gain at t that lands as a loss at u; 0 on the aligned hemisphere, 1 at exact opposition</span></div>
 
 <figure>
 <svg viewBox="0 0 560 245" width="560">
@@ -283,52 +256,40 @@ corpus scale, not evidence of clustering.</p>
       -webkit-mask:radial-gradient(circle 75px at 50% 50%, transparent 65.4px, black 65.6px 74.3px, transparent 74.5px);"></div>
   </foreignObject>
   <line x1="90" y1="115" x2="156" y2="115" stroke="#333" stroke-width="2" marker-end="url(#mT)"/>
-  <text x="90" y="230" font-size="12" fill="#555" text-anchor="middle">d = 2 — mean p = 1/π</text>
+  <text x="90" y="230" font-size="12" fill="#555" text-anchor="middle">d=2: mean(p) = 1/π</text>
 
   <circle cx="280" cy="115" r="70" fill="#2563eb"/>
   <circle cx="280" cy="115" r="70" fill="url(#pathGrad)"/>
   <ellipse cx="280" cy="115" rx="70" ry="20" fill="none" stroke="#eee" stroke-width="1" stroke-dasharray="3 3"/>
   <line x1="280" y1="115" x2="280" y2="174" stroke="#333" stroke-width="2" marker-end="url(#mT)"/>
   <circle cx="280" cy="115" r="70" fill="none" stroke="#333" stroke-width="1.5"/>
-  <text x="280" y="230" font-size="12" fill="#555" text-anchor="middle">d = 3 — mean p = 1/4</text>
+  <text x="280" y="230" font-size="12" fill="#555" text-anchor="middle">d=3: mean(p) = 1/4</text>
 
   <text x="470" y="124" font-size="28" fill="#333" text-anchor="middle">…</text>
-  <text x="470" y="230" font-size="12" fill="#555" text-anchor="middle">d ≥ 4 — mean p ~ 1/√(2πd)</text>
+  <text x="470" y="230" font-size="12" fill="#555" text-anchor="middle">d ≥ 4: mean(p) ≈ 1/√(2πd)</text>
 </svg>
-<figcaption>The pathology metric as a continuous shade: blue is p = 0 (the whole aligned hemisphere), red is
-p = 1 at exact opposition, purple the 120°/240° rays. "How much of the space is pathological" is the average of
-the shade over the surface: 1/π on the circle, 1/4 on the sphere, ~ 1/√(2πd) beyond — severity washes out with
-dimension even though the anti-aligned hemisphere is always half the space.</figcaption>
 </figure>
 
-<p>"What fraction of the space is pathological" is then an average — the same operation as averaging a function
-over an interval: integrate p over the sphere, divide by its area. The ceiling is 1/2 at every dimension (the
-whole anti-aligned hemisphere at full severity); the actual average is lower and decays, because severity is thin
-near the equator. For d = 3, cos θ is uniform on [-1, 1], so the sphere average <em>is</em> the interval
-average:</p>
-
-$$d = 2:\ \frac{1}{2\pi}\int_0^{2\pi}\! p\; d\theta = \frac{1}{\pi} \approx 0.318 \qquad d = 3:\ \frac{1}{2}\int_{-1}^{0}(-x)\,dx = \frac{1}{4}$$
-
-<p>In general, exact at every d:</p>
+<p>"What fraction of the space is pathological" is an average: integrate p over the sphere, divide by its area. The general equation is then:</p>
 
 $$\mathbb{E}[p] = \frac{\Gamma(d/2)}{\sqrt{\pi}\,(d-1)\,\Gamma((d-1)/2)} \approx \frac{1}{\sqrt{2\pi d}}$$
 
-<p>Two more exact facts complete the picture. The frequency never changes: P(p &gt; 0) = 1/2 at every d — half of
-all random task pairs are anti-aligned; a hemisphere is a hemisphere. And the second moment is E[p²] = 1/(2d).
-What vanishes with d is never frequency, only severity:</p>
+<h3>Concentration of measure: random vectors in high dimensions are basically orthogonal</h3>
 
-<table>
-  <tr><th>dimension_count</th><th>sd(cos θ) = 1/√d</th><th>E[p] ≈ 1/√(2πd)</th><th>√E[p²] = 1/√(2d)</th></tr>
-  <tr><td>64</td><td>0.125</td><td>0.050</td><td>0.088</td></tr>
-  <tr><td>128</td><td>0.088</td><td>0.035</td><td>0.062</td></tr>
-  <tr><td>256</td><td>0.062</td><td>0.025</td><td>0.044</td></tr>
-  <tr><td>384</td><td>0.051</td><td>0.020</td><td>0.036</td></tr>
-</table>
+<p>Fix any task direction <code>t</code>. For a uniform random <code>u</code>, cos θ_tu is a single coordinate of
+<code>u</code>, and exchangeability (Σ u_i² = 1) gives the master identity — exact at every d, no asymptotics:</p>
 
-<p>A thresholded zone like cos θ ≤ -0.5 mixes the two perspectives: its <em>frequency</em> vanishes exponentially
-(the sub-gaussian tails above) while <em>mean</em> severity vanishes polynomially (here) — the same concentration
-fact from two sides. Both statements concern the uniform prior. Real corpora are anisotropic and clustered, and
-there the metric has a sharper reading: as a domain count.</p>
+<div class="formula">E[cos θ] = 0     E[cos² θ] = 1/d     →     sd(cos θ) = 1/√d</div>
+
+<p>Random directions concentrate at 90° ± 1/√d: in high dimension, near-orthogonality is the default and alignment
+is the anomaly that structure (clustering, anisotropy — §4) must earn. The tails are sub-gaussian,
+P(|cos θ| &gt; ε) ~ e^(-d·ε²/2), so any <em>fixed</em> alignment level becomes exponentially rare in d.</p>
+
+<p>Concentration governs the <em>bulk</em>, not the extremes. Over a corpus of N problems, the worst alignment to
+a fixed task scales like √(2 ln N / d) and the worst pair like √(4 ln N / d) — at d = 256, N = 100k that is ≈ 0.30
+and ≈ 0.42. ln N eats most of √d: forcing even the worst pair below ε needs d ≳ 4 ln N / ε² (≈ 460 for ε = 0.2 at
+N = 100k). A sprinkling of 0.3–0.4 cells in a pairwise-cosine heatmap is what <em>uniform</em> looks like at
+corpus scale, not evidence of clustering.</p>
 
 <h3>Centering pins the mean: the -1/(N-1) identity</h3>
 
